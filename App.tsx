@@ -1,117 +1,111 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
-import Landing from "./pages/Landing";
-import Generator from "./pages/Generator";
-import QuizEdit from "./pages/QuizEdit";
-import Auth from "./pages/Auth";
-import QuizPlay from "./pages/QuizPlay";
-import QuizGenerating from "./pages/QuizGenerating";
-import ProtectedRoute from "./components/ProtectedRoute";
-import QuizManage from "./pages/QuizManage";
-import QuizHistory from "./pages/QuizHistory";
-import QuizStart from "./pages/QuizStart";
-import QuizSearch from "./pages/QuizSearch";
-import AttemptDetail from "./pages/AttemptDetail";
-import ListPoints from "./pages/ListPoints";
 import { ThemeProvider } from "./context/ThemeContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import MainLayout from "./components/MainLayout"; // Bắt buộc phải có để hiện Sidebar/Topbar
+
+// --- Import các trang bạn đã làm ---
+import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";     // Trang chủ mới
+import MyCourses from "./pages/MyCourses";     // Khóa học của tôi
+import AIChat from "./pages/AIChat";           // Chat với AI
+import Marketplace from "./pages/Marketplace"; // Chợ khóa học
+import CreatePlan from "./pages/CreatePlan";   // Tạo kế hoạch học tập mới
+import Generator from "./pages/Generator";     // Trình tạo Quiz
+import QuizPlay from "./pages/QuizPlay";       // Trang làm bài
+import QuizEdit from "./pages/QuizEdit";       // Trang sửa Quiz
+import QuizHistory from "./pages/QuizHistory"; // Lịch sử làm bài
+import AttemptDetail from "./pages/AttemptDetail"; // Chi tiết kết quả
+import CreatePlanFromDoc from "./pages/CreatePlanFromDoc";
 
 const App: React.FC = () => {
   return (
     <ThemeProvider>
       <Router>
-        {/* THAY ĐỔI: Thêm dark:bg-gray-950 để đổi màu nền toàn trang khi sang chế độ tối */}
-        <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300">
-          <Navbar />
-          <main className="flex-1">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route
-                path="/quiz/search"
-                element={
-                  <ProtectedRoute>
-                    <QuizSearch />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/generate"
-                element={
-                  <ProtectedRoute>
-                    <Generator />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/quiz/:id/edit"
-                element={
-                  <ProtectedRoute>
-                    <QuizEdit />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="/quiz/:id/start" element={<QuizStart />} />
-              <Route
-                path="/quiz/:id"
-                element={
-                  <ProtectedRoute>
-                    <QuizPlay />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/history"
-                element={
-                  <ProtectedRoute>
-                    <QuizHistory />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/manage"
-                element={
-                  <ProtectedRoute>
-                    <QuizManage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/generating"
-                element={
-                  <ProtectedRoute>
-                    <QuizGenerating />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/history/detail/:id"
-                element={
-                  <ProtectedRoute>
-                    <AttemptDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/manage/:id"
-                element={
-                  <ProtectedRoute>
-                    <ListPoints />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </main>
+        {/* Nền tối sâu Navy theo phong cách Study Assistant */}
+        <div className="min-h-screen bg-white dark:bg-[#020617] text-slate-900 dark:text-slate-100 transition-colors duration-300 selection:bg-purple-500/30">
+          <Routes>
+            
+            {/* 1. TRANG CÔNG KHAI (Không có Sidebar) */}
+            <Route path="/auth" element={<Auth />} />
 
-          {/* SỬA FOOTER: Xóa bỏ các class lặp lại, thêm dark mode gọn gàng */}
-          <footer className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 py-12 transition-colors duration-300">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-              <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
-                &copy; {new Date().getFullYear()} QuizAI. Built with Gemini 3 for
-                the future of learning.
-              </p>
-            </div>
-          </footer>
+            {/* 2. TRANG LÀM BÀI (Thường ẩn Sidebar để tập trung - Focus Mode) */}
+            <Route path="/quiz/:id" element={
+              <ProtectedRoute>
+                <QuizPlay />
+              </ProtectedRoute>
+            } />
+
+            {/* 3. CÁC TRANG DASHBOARD (Có Sidebar + Topbar thông qua MainLayout) */}
+            
+            {/* Trang chủ - Dashboard */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <MainLayout><Dashboard /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Khóa học của tôi */}
+            <Route path="/courses" element={
+              <ProtectedRoute>
+                <MainLayout><MyCourses /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Chat với trợ lý AI */}
+            <Route path="/ai-chat" element={
+              <ProtectedRoute>
+                <MainLayout><AIChat /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Chợ khóa học */}
+            <Route path="/market" element={
+              <ProtectedRoute>
+                <MainLayout><Marketplace /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Form tạo kế hoạch học tập mới */}
+            <Route path="/create-plan" element={
+              <ProtectedRoute>
+                <MainLayout><CreatePlan /></MainLayout>
+              </ProtectedRoute>
+            } />
+            <Route 
+  path="/create-plan-from-doc" 
+  element={<ProtectedRoute><MainLayout><CreatePlanFromDoc /></MainLayout></ProtectedRoute>} 
+/>
+
+            {/* Công cụ tạo Quiz/Tài liệu */}
+            <Route path="/generate" element={
+              <ProtectedRoute>
+                <MainLayout><Generator /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Quản lý/Lịch sử học tập */}
+            <Route path="/history" element={
+              <ProtectedRoute>
+                <MainLayout><QuizHistory /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Chi tiết từng lần làm bài */}
+            <Route path="/history/detail/:quizId/:number" element={
+              <ProtectedRoute>
+                <MainLayout><AttemptDetail /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Chỉnh sửa nội dung học tập */}
+            <Route path="/quiz/:id/edit" element={
+              <ProtectedRoute>
+                <MainLayout><QuizEdit /></MainLayout>
+              </ProtectedRoute>
+            } />
+
+          </Routes>
         </div>
       </Router>
     </ThemeProvider>

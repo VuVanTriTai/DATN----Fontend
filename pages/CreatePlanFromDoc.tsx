@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { api } from "../services/api";
 import { 
   FileText, 
   UploadCloud, 
@@ -32,19 +33,33 @@ const CreatePlanFromDoc: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleAnalyze = async () => {
-    if (!selectedFile) return;
-    
-    setIsUploading(true);
-    // Giả lập quá trình AI phân tích tài liệu
-    setTimeout(() => {
-      setIsUploading(false);
-      // Sau khi phân tích xong có thể điều hướng sang trang kế hoạch chi tiết
-      // navigate('/plan/new-id');
-      alert("AI đã phân tích xong tài liệu: " + selectedFile.name);
-    }, 3000);
-  };
+  // Trong CreatePlanFromDoc.tsx
+const handleAnalyze = async () => {
+  if (!selectedFile) return;
+  setIsUploading(true);
 
+  try {
+    // Bước 1: Trích xuất văn bản từ file (PDF/Ảnh)
+    const extractRes = await api.file.extract(selectedFile);
+    const rawText = extractRes.data.content;
+
+    // Bước 2: Gửi văn bản cho AI để thiết kế lộ trình 7 ngày
+    const planRes = await api.plan.generateFromText({
+      title: selectedFile.name.split('.')[0], // Lấy tên file làm tiêu đề
+      extractedText: rawText,
+      numDays: 7
+    });
+
+    if (planRes.success === "true" || planRes.success === true) {
+      // Bước 3: Chuyển sang trang Roadmap (Ảnh 2 bạn gửi)
+      navigate(`/plan/${planRes.data.planId}`);
+    }
+  } catch (err) {
+    alert("Lỗi xử lý tài liệu. Vui lòng thử lại.");
+  } finally {
+    setIsUploading(false);
+  }
+};
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 lg:p-8 animate-in fade-in duration-500">
       <div className="max-w-2xl w-full bg-[#1e293b] rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-800">

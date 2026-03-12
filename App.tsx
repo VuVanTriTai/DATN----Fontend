@@ -17,6 +17,8 @@ import QuizEdit from "./pages/QuizEdit";       // Trang sửa Quiz
 import QuizHistory from "./pages/QuizHistory"; // Lịch sử làm bài
 import AttemptDetail from "./pages/AttemptDetail"; // Chi tiết kết quả
 import CreatePlanFromDoc from "./pages/CreatePlanFromDoc";
+import LessonView from "./pages/LessonView";
+import StudyPlan from "./pages/StudyPlan";
 
 const App: React.FC = () => {
   return (
@@ -106,6 +108,21 @@ const App: React.FC = () => {
             } />
 
           </Routes>
+          // Route cho trang Lộ trình (Ảnh 2 - Roadmap)
+<Route path="/plan/:id" element={<ProtectedRoute><MainLayout><StudyPlan /></MainLayout></ProtectedRoute>} />
+
+// Route cho trang Xem bài học (Ảnh 1 & 3 - Tab view)
+<Route path="/plan/:id/lesson/:lessonId" element={<ProtectedRoute><LessonView /></ProtectedRoute>} />
+        
+        <Route path="/plan/:planId/lesson/:dayNumber" element={<ProtectedRoute><MainLayout><LessonView /></MainLayout></ProtectedRoute>} />
+        
+
+
+
+
+
+
+        
         </div>
       </Router>
     </ThemeProvider>

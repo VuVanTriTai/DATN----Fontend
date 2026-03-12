@@ -180,6 +180,48 @@ export const api = {
       const response = await axiosInstance.get(`/attempt/${quizId}/quiz`);
       return response.data;
     },
-  }
-  
+  },
+  // 1. Xử lý File
+  file: {
+    extract: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await axiosInstance.post('/file/extract', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data;
+    }
+  },
+
+  // 2. Xử lý Trí tuệ nhân tạo (AI)
+  ai: {
+    chatDoc: async (question: string, courseId: string) => {
+      const response = await axiosInstance.post('/ai/chat-doc', { question, courseId });
+      return response.data;
+    },
+    search: async (question: string, courseId: string) => {
+      const response = await axiosInstance.post('/ai/search', { question, courseId });
+      return response.data;
+    }
+  },
+
+  // 3. Xử lý Lộ trình học tập (Plan)
+ plan: {
+    generateFromText: async (data: { title: string, extractedText: string, numDays: number }) => {
+      const response = await axiosInstance.post('/plan/generate-from-text', data);
+      return response.data;
+    },
+    
+    getById: async (id: string) => {
+      const response = await axiosInstance.get(`/plan/${id}`);
+      return response.data;
+    },
+
+    // THÊM HÀM NÀY VÀO ĐỂ HẾT LỖI GẠCH ĐỎ:
+    getLessonDetail: async (planId: string, dayNumber: string | number) => {
+      // Đường dẫn này phải khớp với Route bạn đặt ở Backend (ví dụ: /plan/:id/lesson/:dayNumber)
+      const response = await axiosInstance.get(`/plan/${planId}/lesson/${dayNumber}`);
+      return response.data;
+    }
+  },
 };

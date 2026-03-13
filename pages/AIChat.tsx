@@ -1,34 +1,62 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, Paperclip } from 'lucide-react';
+//import { chatWithDoc } from '@/services/api';
+import { api } from '../services/api'; // Đảm bảo bạn đã có API service để gọi
 
-const AIChat: React.FC = () => {
+
+
+interface AIChatProps {
+  courseId?: string; // Dấu ? nghĩa là có thể có hoặc không
+}
+
+const AIChat: React.FC<AIChatProps> = ({ courseId }) => {
   const [messages, setMessages] = useState([
     { role: 'ai', content: 'Chào bạn! Tôi là trợ lý học tập AI. Bạn cần tôi hỗ trợ gì về bài học hôm nay không?' }
   ]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Thêm dòng này vào
+const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    
-    // Add user message
-    const newMessages = [...messages, { role: 'user', content: input }];
-    setMessages(newMessages);
-    setInput("");
+  // Cần import thêm API service của bạn
+// import { chatWithDoc } from '@/services/api'; 
 
-    // Giả lập AI phản hồi (Bạn sẽ nối API thật vào đây)
-    setTimeout(() => {
+const handleSend = async () => {
+  if (!input.trim() || isLoading) return;
+
+  const userMessage = { role: 'user', content: input };
+  setMessages(prev => [...prev, userMessage]);
+  const currentInput = input; // Lưu lại input để xử lý
+  setInput("");
+  setIsLoading(true);
+
+  try {
+    // GỌI ĐÚNG HÀM NÀY: api.ai.chatDoc
+    const response = await api.ai.chatDoc(currentInput, courseId || "");
+
+    // Backend trả về success: "true" (chuỗi)
+    if (response.success === "true") {
       setMessages(prev => [...prev, { 
         role: 'ai', 
-        content: `Tôi đã nhận được câu hỏi: "${input}". Đang phân tích dữ liệu bài học cho bạn...` 
+        content: response.data.answer // Truy cập vào data.answer theo cấu trúc Backend
       }]);
-    }, 1000);
-  };
-
+    } else {
+      throw new Error(response.message);
+    }
+  } catch (error: any) {
+    console.error("Chat Error:", error);
+    setMessages(prev => [...prev, { 
+      role: 'ai', 
+      content: "Xin lỗi, AI đang bận hoặc có lỗi kết nối. Vui lòng thử lại sau." 
+    }]);
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <div className="h-[calc(100vh-120px)] flex flex-col bg-[#0f172a] rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl">
       {/* Chat Header */}
@@ -39,10 +67,10 @@ const AIChat: React.FC = () => {
           </div>
           <div>
             <h2 className="font-bold">AI Study Buddy</h2>
-            <p className="text-xs text-emerald-400 flex items-center gap-1">
+            <div className="text-xs text-emerald-400 flex items-center gap-1">
               <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
               Sẵn sàng hỗ trợ
-            </p>
+            </div>
           </div>
         </div>
         <button className="text-slate-400 hover:text-white flex items-center gap-2 text-sm bg-slate-800 px-4 py-2 rounded-xl transition-all">

@@ -47,14 +47,16 @@ const MyCourses: React.FC = () => {
             <span>Tạo Khóa Học</span>
           </button>
           
+          {/* ĐÚNG */}
           <button 
-            className="flex items-center gap-2 bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-purple-900/20 active:scale-95"
-          >
-            <FileText size={18} />
-            <button onClick={() => navigate('/create-plan-from-doc')}>
-            Tạo từ Tài Liệu
-            </button>
-          </button>
+  onClick={() => navigate('/create-plan-from-doc')}
+  className="flex items-center gap-2 bg-[#7c3aed] text-white px-5 py-2.5 rounded-xl font-bold"
+>
+  <FileText size={18} />
+  <span>Tạo từ Tài Liệu</span>
+</button>
+
+
         </div>
       </div>
 

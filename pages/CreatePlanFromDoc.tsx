@@ -39,23 +39,38 @@ const handleAnalyze = async () => {
   setIsUploading(true);
 
   try {
-    // Bước 1: Trích xuất văn bản từ file (PDF/Ảnh)
     const extractRes = await api.file.extract(selectedFile);
-    const rawText = extractRes.data.content;
+    
+    // DEBUG: Bạn hãy thêm dòng này để kiểm tra dữ liệu thật trong Console
+    console.log("Dữ liệu trích xuất:", extractRes);
 
-    // Bước 2: Gửi văn bản cho AI để thiết kế lộ trình 7 ngày
+    // Kiểm tra xem content nằm ở đâu. Thử cả 2 trường hợp phổ biến:
+    const rawText = extractRes.data?.content || extractRes.content;
+
+    if (!rawText) {
+      throw new Error("Không tìm thấy nội dung văn bản trong file.");
+    }
+
+    // Bước 2: Gọi API tạo Plan
     const planRes = await api.plan.generateFromText({
-      title: selectedFile.name.split('.')[0], // Lấy tên file làm tiêu đề
+      title: selectedFile.name.split('.')[0],
       extractedText: rawText,
       numDays: 7
     });
 
+    console.log("Kết quả tạo Plan:", planRes);
+
+    // Kiểm tra success (Backend của bạn trả về string "true")
     if (planRes.success === "true" || planRes.success === true) {
-      // Bước 3: Chuyển sang trang Roadmap (Ảnh 2 bạn gửi)
-      navigate(`/plan/${planRes.data.planId}`);
+      const planId = planRes.data?._id || planRes.data?.id || planRes.planId;
+      navigate(`/plan/${planId}`);
+    } else {
+      alert("AI không thể tạo lộ trình: " + planRes.message);
     }
-  } catch (err) {
-    alert("Lỗi xử lý tài liệu. Vui lòng thử lại.");
+
+  } catch (err: any) {
+    console.error("Lỗi chi tiết:", err);
+    alert("Lỗi xử lý tài liệu: " + (err.message || "Vui lòng thử lại."));
   } finally {
     setIsUploading(false);
   }

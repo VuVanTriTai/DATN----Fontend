@@ -6,6 +6,7 @@ import {
   MessageCircle, ArrowLeft, Loader2, Search 
 } from 'lucide-react';
 import AIChat from './AIChat'; // Tái sử dụng component Chat
+import QuizView from './QuizView';
 
 const LessonView: React.FC = () => {
   const { id, dayNumber } = useParams();
@@ -16,6 +17,29 @@ const LessonView: React.FC = () => {
   const [lesson, setLesson] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('study'); // Mặc định là tab Học tập
+
+
+const fetchLesson = async (isSilent = false) => { // Thêm tham số isSilent
+  if (!id || !dayNumber || dayNumber === "undefined") return;
+  try {
+    if (!isSilent) setLoading(true); // Chỉ hiện loading nếu không phải silent
+    const res = await api.plan.getLessonDetail(id, dayNumber);
+    if (res.success === "true") {
+      setLesson(res.data);
+    }
+  } catch (error) {
+    console.error("Lỗi lấy bài học:", error);
+  } finally {
+    if (!isSilent) setLoading(false);
+  }
+};
+
+  // --- TRONG useEffect CHỈ CẦN GỌI NÓ ---
+  useEffect(() => {
+    fetchLesson();
+  }, [id, dayNumber]);
+
+
 
   useEffect(() => {
     const fetchLesson = async () => {
@@ -88,27 +112,19 @@ useEffect(() => {
           </div>
         );
 
-      case 'quiz':
-        return (
-          <div className="space-y-4">
-             {lesson?.quiz?.length > 0 ? (
-               lesson.quiz.map((q: any, idx: number) => (
-                 <div key={idx} className="bg-[#1e293b] p-6 rounded-2xl border border-slate-800">
-                    <p className="font-bold mb-4 text-blue-400">{idx + 1}. {q.question}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {q.options.map((opt: string, i: number) => (
-                        <button key={i} className="p-4 bg-[#0f172a] hover:bg-blue-600/20 border border-slate-700 rounded-xl text-left text-sm transition-all">
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                 </div>
-               ))
-             ) : (
-               <div className="text-center p-20 text-slate-500">AI chưa tạo câu hỏi cho bài học này.</div>
-             )}
-          </div>
-        );
+      // Trong LessonView.tsx
+case 'quiz':
+  return (
+    <QuizView 
+      planId={id!} 
+      dayNumber={Number(dayNumber)} 
+      questions={lesson?.quiz || []} 
+      status={lesson?.status}
+      onSuccess={() => {
+          fetchLesson(true); // <--- TRUYỀN true ĐỂ CẬP NHẬT NGẦM
+      }}
+    />
+  );
 
       case 'chat':
         // Truyền courseId vào để AI biết đang chat về tài liệu nào (RAG)

@@ -119,7 +119,12 @@ export const api = {
     delete: async (id: string) => {
       const response = await axiosInstance.delete(`/quiz/${id}`);
       return response.data;
-    }
+    },
+    // Trong object api.quiz hoặc api.plan
+    submitLessonQuiz: async (data: { planId: string; dayNumber: number; answers: any }) => {
+    const response = await axiosInstance.post("/quiz/submit-lesson", data);
+    return response.data;
+},
   },
 
   // 3. Hệ thống Lộ trình học tập (Plan & Lesson)
@@ -172,8 +177,28 @@ export const api = {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return response.data;
+    },
+   
+
+    // 1. Hàm gọi AI phân tích tài liệu (mới)
+    analyze: async (data: { text: string }) => {
+      const response = await axiosInstance.post('/course/analyze', data);
+      return response.data;
+    },
+
+    // 2. Hàm gọi AI chia lại lộ trình khi đổi số ngày (mới)
+    regenerate: async (data: { rawText: string; days: number }) => {
+      const response = await axiosInstance.post('/course/regenerate', data);
+      return response.data;
+    },
+
+    // 3. Hàm tạo khóa học chính thức (mới)
+    create: async (data: any) => {
+      const response = await axiosInstance.post('/course/create', data);
+      return response.data;
     }
   },
+  
 
   // 7. Lịch sử làm bài (Attempts)
   attempt: {

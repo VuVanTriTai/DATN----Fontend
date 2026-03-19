@@ -34,23 +34,28 @@ interface ReviewCourseProps {
 const ReviewCourse: React.FC<ReviewCourseProps> = ({ data, rawText, onBack }) => {
   const navigate = useNavigate();
   
-  // States quản lý thay đổi người dùng
   const [days, setDays] = useState<number>(data.analysis.suggestedDays);
   const [previewPlan, setPreviewPlan] = useState(data.previewPlan);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
+  // GIỚI HẠN NGÀY
+  const MAX_ALLOWED_DAYS = 14;
   // Hàm gọi AI chia lại tiêu đề khi người dùng đổi số ngày
   const handleRegenerate = async (newDays: number) => {
-    if (newDays === days || newDays < 1 || newDays > 30) return;
+    // Thêm check giới hạn 14 ngày
+    if (newDays > MAX_ALLOWED_DAYS) {
+        alert(`Hiện tại hệ thống chỉ hỗ trợ tối đa ${MAX_ALLOWED_DAYS} ngày để đảm bảo chất lượng bài học.`);
+        return;
+    }
+    if (newDays === days || newDays < 1) return;
     
     setDays(newDays);
     setIsRegenerating(true);
     try {
-      // Gọi API regenerate đã thêm vào api.ts
       const res = await api.course.regenerate({ rawText, days: newDays });
       if (res.success === "true" || res.success === true) {
-        setPreviewPlan(res.data); // res.data thường là mảng plan mới
+        setPreviewPlan(res.data);
       }
     } catch (error) {
       console.error("Lỗi cập nhật lộ trình:", error);
@@ -58,34 +63,32 @@ const ReviewCourse: React.FC<ReviewCourseProps> = ({ data, rawText, onBack }) =>
       setIsRegenerating(false);
     }
   };
-
   // Hàm xác nhận tạo toàn bộ nội dung khóa học và lưu vào Database
   const handleConfirmCreate = async () => {
     setIsCreating(true);
     try {
-      // Gọi API tạo khóa học thật (viết nội dung chi tiết)
-      const res = await api.plan.generateFromText({
+      const res = await api.course.finalizeCreate({
         title: data.analysis.suggestedTitle,
         extractedText: rawText,
-        numDays: days
+        numDays: days,
+        difficulty: data.analysis.difficulty,
+        previewPlan: previewPlan 
       });
 
-      if (res.success === "true" || res.success === true) {
-        // Sau khi tạo xong, điều hướng sang trang Roadmap (StudyPlan)
+       if (res.success === "true" || res.success === true) {
         const planId = res.data?._id || res.data?.id;
-        navigate(`/plan/${planId}`);
+        navigate(`/plan/${planId}`); 
       }
     } catch (error) {
       console.error("Lỗi tạo khóa học:", error);
-      alert("Đã có lỗi xảy ra trong quá trình khởi tạo bài học chi tiết.");
+      alert("Đã có lỗi xảy ra. Có thể tài liệu quá dài hoặc vượt hạn mức AI.");
     } finally {
       setIsCreating(false);
     }
   };
 
   return (
-    <div className="max-w-3xl w-full bg-[#1e293b] rounded-[2.5rem] border border-slate-800 p-8 lg:p-10 shadow-2xl space-y-8 animate-in zoom-in duration-300">
-      
+    <div className="max-w-3xl w-full bg-[#1e293b] rounded-[2.5rem] border border-slate-800 p-8 lg:p-10 shadow-2xl space-y-8">
       {/* --- Header & Back Button --- */}
       <div className="flex items-center justify-between">
         <button 
@@ -144,10 +147,11 @@ const ReviewCourse: React.FC<ReviewCourseProps> = ({ data, rawText, onBack }) =>
       {/* --- Customize Duration --- */}
       <div className="space-y-4">
         <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2 ml-2">
-          <Calendar size={14} /> Chỉnh sửa thời gian học
+          <Calendar size={14} /> Chỉnh sửa thời gian học (Tối đa {MAX_ALLOWED_DAYS} ngày)
         </label>
         <div className="flex flex-wrap gap-2">
-          {[7, 10, 14, 21].map((val) => (
+          {/* Thay đổi các mốc gợi ý cho phù hợp với 14 ngày */}
+          {[3, 5, 7, 10, 14].map((val) => (
             <button
               key={val}
               onClick={() => handleRegenerate(val)}
@@ -165,9 +169,13 @@ const ReviewCourse: React.FC<ReviewCourseProps> = ({ data, rawText, onBack }) =>
           <div className="relative flex-1 min-w-[120px]">
              <input 
               type="number"
+              max={MAX_ALLOWED_DAYS}
               placeholder="Khác..."
               className="w-full bg-slate-900 border-2 border-slate-800 rounded-2xl px-6 py-3 text-sm font-bold text-white outline-none focus:border-blue-500 transition-all"
-              onBlur={(e) => handleRegenerate(Number(e.target.value))}
+              onBlur={(e) => {
+                const val = Number(e.target.value);
+                if (val > 0) handleRegenerate(val);
+              }}
              />
           </div>
         </div>

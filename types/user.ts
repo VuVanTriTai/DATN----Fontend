@@ -1,9 +1,11 @@
 
+export type Role = "student" | "mentor";
 
 export interface User {
-    id: string;
-    name: string;
-    email: string;
+  _id: string;
+  email: string;
+  role: Role;
+fullName: string;
 }
 
 export interface LoginResponse {

@@ -1,197 +1,168 @@
-import { ApiResponse } from "@/types/apiResponse";
-import { LoginResponse, User } from "@/types/auth";
-import {
-  clearToken,
-  getAccessToken,
-  getRefreshToken,
-  setToken,
-} from "@/utils/authUtils";
 import axios from "axios";
 
-/**
- * API Configuration
- */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
 
-/**
- * Request Interceptor
- */
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = getAccessToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+// Request Interceptor: Gắn token vào mỗi request
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
-/**
- * Response Interceptor (Refresh Token)
- */
+// Response Interceptor: Xử lý lỗi 401 (Hết hạn token)
 axiosInstance.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      const refreshToken = getRefreshToken();
-      if (!refreshToken) {
-        clearToken();
-        window.location.href = "/auth";
-        return Promise.reject(error);
-      }
-      try {
-        const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-        const { accessToken, refreshToken: newRefreshToken } = res.data.data;
-        setToken(accessToken, newRefreshToken);
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        return axiosInstance(originalRequest);
-      } catch (refreshError) {
-        clearToken();
-        window.location.href = "/auth";
-        return Promise.reject(refreshError);
-      }
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.clear();
+      window.location.href = "/auth";
     }
-    return Promise.reject(error);
+    return Promise.reject(err);
   }
 );
 
 export const api = {
-  // 1. Xác thực
+  // 1. VAI TRÒ & TÀI KHOẢN (Auth & Profile)
   auth: {
-    login: async (email: string, password: string): Promise<ApiResponse<LoginResponse>> => {
-      const response = await axiosInstance.post("/auth/login", { email, password });
-      setToken(response.data.data.accessToken, response.data.data.refreshToken);
-      return response.data;
-    },
-    register: async (name: string, email: string, password: string): Promise<ApiResponse<User>> => {
-      const response = await axiosInstance.post("/auth/register", { fullName: name, email, password });
-      return response.data;
-    },
-    getMe: async () => {
-      const response = await axiosInstance.get("/auth/me");
-      return response.data;
-    }
+    login: (data: any) => axiosInstance.post("/auth/login", data).then(res => res.data),
+    register: (data: any) => axiosInstance.post("/auth/register", data).then(res => res.data),
+    getMe: () => axiosInstance.get("/auth/me").then(res => res.data),
+    getInstructors: () => axiosInstance.get("/auth/instructors").then(res => res.data), // Lấy ds giáo viên cho Learner chọn
+    updateProfile: (data: any) => axiosInstance.put("/users/profile", data).then(res => res.data),
+    changePassword: (data: any) => axiosInstance.post("/users/change-password", data).then(res => res.data),
   },
 
-  // 2. Hệ thống Khóa học (Pipeline RAG & AI Analysis)
+  // 2. QUY TRÌNH TẠO LỘ TRÌNH AI (Learner Only)
   course: {
-    // BƯỚC 1: Phân tích tài liệu thô (để hiện trang Review)
-    analyze: async (data: { text: string }) => {
-      const response = await axiosInstance.post('/course/analyze', data);
-      return response.data;
-    },
-
-    // BƯỚC 2: Chia lại lộ trình khi đổi số ngày
-    regenerate: async (data: { rawText: string; days: number }) => {
-      const response = await axiosInstance.post('/course/regenerate', data);
-      return response.data;
-    },
-
-    // BƯỚC 3: Xác nhận tạo khóa học thật (Xử lý Chunking + Embedding + RAG)
-    finalizeCreate: async (data: { 
-      title: string; 
-      extractedText: string; 
-      numDays: number; 
-      difficulty: string;
-      previewPlan: any[]; 
-    }) => {
-      const response = await axiosInstance.post('/course/create', data);
-      return response.data;
-    }
+    analyze: (text: string, learningGoals?: { focus: "theory" | "practice"; depth: "basic" | "deep" }) =>
+      axiosInstance.post("/plan/analyze", { text, learningGoals }).then(res => res.data),
+    regenerate: (data: any) => axiosInstance.post("/plan/regenerate", data).then(res => res.data),
+    finalizeCreate: (data: any) => axiosInstance.post("/plan/create", data).then(res => res.data),
   },
 
-  // 3. Quản lý Lộ trình (Plan)
+  // 3. QUẢN LÝ LỘ TRÌNH & BÀI TẬP (Learner)
+  // --- QUẢN LÝ LỘ TRÌNH (PLAN) ---
   plan: {
-    getById: async (id: string) => {
-      const response = await axiosInstance.get(`/plan/${id}`);
-      return response.data;
-    },
-    // Lấy chi tiết bài học của 1 ngày cụ thể
-    getLessonDetail: async (planId: string, dayNumber: number | string) => {
-      const response = await axiosInstance.get(`/plan/${planId}/lesson/${dayNumber}`);
-      return response.data;
-    },
-    // Lấy toàn bộ danh sách các Plan của tôi
-    getMyPlans: async () => {
-        const response = await axiosInstance.get("/plan/me");
-        return response.data;
-    },
-     getDetail: async (id: string) => {
-    const response = await axiosInstance.get(`/plan/${id}`);
-    return response.data;
-  },
+    getMyPlans: () => axiosInstance.get("/plan/me").then(res => res.data),
+    getDetail: (id: string) => axiosInstance.get(`/plan/${id}`).then(res => res.data),
+    getLesson: (id: string, day: string | number) => axiosInstance.get(`/plan/${id}/lesson/${day}`).then(res => res.data),
+    delete: (id: string) => axiosInstance.delete(`/plan/${id}`).then(res => res.data),
+    updateInstructor: (id: string, instructorId: string) => 
+        axiosInstance.put(`/plan/${id}/instructor`, { instructorId }).then(res => res.data),
+    share: (id: string) => axiosInstance.post(`/plan/${id}/share`).then(res => res.data),
   },
 
-  // 4. Biên tập Bài học (Lesson Editor)
-  lesson: {
-    // Cập nhật nội dung Markdown, Summary, hoặc Quiz thủ công
-    update: async (lessonId: string, data: any) => {
-      const response = await axiosInstance.put(`/lesson/${lessonId}`, data);
-      return response.data;
-    },
-    // Yêu cầu AI tạo bộ Quiz mới cho bài học này (Tính năng Sparkles AI)
-    generateQuiz: async (lessonId: string, prompt?: string) => {
-      const response = await axiosInstance.post(`/lesson/${lessonId}/generate-quiz`, { prompt });
-      return response.data;
-    },
-    // Xóa bài học
-    delete: async (lessonId: string) => {
-        const response = await axiosInstance.delete(`/lesson/${lessonId}`);
-        return response.data;
-    }
+  // --- DÀNH CHO GIÁO VIÊN (INSTRUCTOR) ---
+  instructor: {
+    getStudents: () => axiosInstance.get("/enrollment/my-students").then(res => res.data),
+    getStudentProgress: (studentId: string) => axiosInstance.get(`/instructor/student/${studentId}/progress`).then(res => res.data),
+    gradeAssignment: (submissionId: string, data: { score: number, comment: string }) => 
+        axiosInstance.post(`/assignment/grade/${submissionId}`, data).then(res => res.data),
   },
-
-  // 5. Tương tác AI (RAG Chat)
-  ai: {
-    chatDoc: async (question: string, courseId: string) => {
-      const response = await axiosInstance.post("/ai/chat-doc", { question, courseId });
-      return response.data;
-    }
-  },
-
-  // 6. Xử lý File
+  // 5. TƯƠNG TÁC AI & FILE
   file: {
-    extract: async (file: File) => {
+    extract: (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await axiosInstance.post("/file/extract", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return response.data;
-    }
+      return axiosInstance.post("/file/extract", formData, { headers: { "Content-Type": "multipart/form-data" } }).then(res => res.data);
+    },
+    getMyDocs: () => axiosInstance.get("/document").then(res => res.data),
   },
-
-  // 7. Hệ thống Quiz & Lịch sử
+  ai: {
+    chat: (question: string, planId: string) => axiosInstance.post("/ai/chat-doc", { question, planId }).then(res => res.data),
+  },
+  // 7. HỆ THỐNG TRẮC NGHIỆM (QUIZ)
   quiz: {
+    /**
+     * Chấm điểm Quiz trong bài học RAG 
+     * HÀM QUAN TRỌNG NHẤT: Dùng để hoàn thành ngày học và mở khóa bài tiếp theo
+     */
     submitLessonQuiz: async (data: { planId: string; dayNumber: number; answers: any }) => {
       const response = await axiosInstance.post("/quiz/submit-lesson", data);
       return response.data;
     },
+
+    /**
+     * Yêu cầu AI (Groq) tạo một bộ Quiz độc lập theo chủ đề
+     */
+    generate: async (data: { 
+      title: string; 
+      topic: string; 
+      numQuestions: number; 
+      difficulty: string; 
+      questionType: string 
+    }) => {
+      const response = await axiosInstance.post("/quiz/generate", data);
+      return response.data;
+    },
+
+    /**
+     * Lấy toàn bộ danh sách Quiz do tôi tạo (Phân trang)
+     */
+    getMyQuizzes: async (page = 1, limit = 10) => {
+      const response = await axiosInstance.get("/quiz", { params: { page, limit } });
+      return response.data;
+    },
+
+    /**
+     * Lấy chi tiết một bộ Quiz (Bao gồm cả đáp án - Dành cho chủ sở hữu)
+     */
+    getById: async (id: string) => {
+      const response = await axiosInstance.get(`/quiz/${id}`);
+      return response.data;
+    },
+
+    /**
+     * Lấy bộ Quiz để làm bài (Ẩn đáp án - Dành cho người làm bài)
+     */
+    getPublic: async (id: string) => {
+      const response = await axiosInstance.get(`/quiz/public/${id}`);
+      return response.data;
+    },
+
+    /**
+     * Nộp bài làm Quiz độc lập
+     */
+    submitStandalone: async (id: string, data: { answers: any; duration: number }) => {
+      const response = await axiosInstance.post(`/quiz/submit/${id}`, data);
+      return response.data;
+    },
+
+    /**
+     * Lấy lịch sử tất cả các lần làm bài của tôi
+     */
     getHistory: async () => {
       const response = await axiosInstance.get("/quiz/history/me");
       return response.data;
-    }
-  },
+    },
 
-  // 8. Kết quả & Tiến độ (Attempts)
-  attempt: {
-    getUserAttempts: async () => {
-      const response = await axiosInstance.get("/attempt");
+    /**
+     * Cập nhật nội dung bộ Quiz (Sửa câu hỏi, tiêu đề...)
+     */
+    update: async (id: string, data: any) => {
+      const response = await axiosInstance.put(`/quiz/${id}`, data);
       return response.data;
     },
-    getById: async (id: string) => {
-      const response = await axiosInstance.get(`/attempt/${id}`);
+
+    /**
+     * Xóa bộ Quiz (Soft delete)
+     */
+    delete: async (id: string) => {
+      const response = await axiosInstance.delete(`/quiz/${id}`);
+      return response.data;
+    },
+
+    /**
+     * Tìm kiếm các bộ Quiz công khai trên hệ thống
+     */
+    search: async (keyword: string) => {
+      const response = await axiosInstance.get("/quiz/search", { params: { keyword } });
       return response.data;
     }
-  }
+  },
 };

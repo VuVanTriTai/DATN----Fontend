@@ -1,81 +1,136 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "./context/ThemeContext";
-import ProtectedRoute from "./components/ProtectedRoute";
-import MainLayout from "./components/MainLayout";
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-// --- Import các trang ---
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import MyCourses from "./pages/MyCourses";
-import AIChat from "./pages/AIChat";
-import Marketplace from "./pages/Marketplace";
-import CreatePlan from "./pages/CreatePlan";
-import Generator from "./pages/Generator";
-import QuizPlay from "./pages/QuizPlay";
-import QuizEdit from "./pages/QuizEdit";
-import QuizHistory from "./pages/QuizHistory";
-import AttemptDetail from "./pages/AttemptDetail";
-import CreatePlanFromDoc from "./pages/CreatePlanFromDoc";
-import LessonView from "./pages/LessonView";
-import StudyPlan from "./pages/StudyPlan";
-import PlanDetail from './pages/PlanDetail';
+// Layouts
+import MainLayout from './components/layout/MainLayout';
 
+// Pages - Auth & Profile
+import Auth from './pages/auth/Auth';
+import Profile from './pages/profile/Profile';
 
-const App: React.FC = () => {
-  return (
-    <ThemeProvider>
-      <Router>
-        {/* Nền tối theo phong cách AI Study Assistant */}
-        <div className="min-h-screen bg-white dark:bg-[#020617] text-slate-900 dark:text-slate-100 transition-colors duration-300">
-          <Routes>
-            
-            {/* 1. TRANG CÔNG KHAI */}
-            <Route path="/auth" element={<Auth />} />
+// Pages - Learner (Người học)
+import LearnerDashboard from './pages/learner/Dashboard';
+import MyPlans from './pages/learner/MyPlans';
+import PlanDetail from './pages/learner/PlanDetail';
+import Documents from './pages/learner/Documents';
+import CreatePlanFromDoc from './pages/learner/CreateCourse/CreatePlanFromDoc'; 
+import LessonView from './pages/learner/LessonView';
 
-            {/* 2. TRANG LÀM BÀI (Focus Mode - Không Sidebar) */}
-            <Route path="/quiz/:id" element={
-              <ProtectedRoute>
-                <QuizPlay />
-              </ProtectedRoute>
-            } />
+// Pages - Instructor (Người hướng dẫn)
+import StudentList from './pages/instructor/StudentList';
+import SharedPlans from './pages/instructor/SharedPlans';
+import StudentPlanView from './pages/instructor/StudentPlanView';
 
-            {/* 3. CÁC TRANG CÓ SIDEBAR & TOPBAR (Bọc trong MainLayout) */}
-            <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-              
-              {/* Trang chủ / Dashboard */}
-              <Route path="/" element={<Dashboard />} />
+/**
+ * 1. Component Bảo vệ Tuyến đường (Hỗ trợ phân loại Learner/Instructor)
+ */
+const ProtectedRoute = ({ 
+  children, 
+  allowedRole 
+}: { 
+  children: React.ReactNode, 
+  allowedRole?: 'learner' | 'instructor' 
+}) => {
+  const { user, role } = useAuth();
 
-              {/* Khóa học & Lộ trình */}
-              <Route path="/courses" element={<MyCourses />} />
-              <Route path="/create-plan" element={<CreatePlan />} />
-              <Route path="/create-plan-from-doc" element={<CreatePlanFromDoc />} />
-              
-              {/* HỆ THỐNG LỘ TRÌNH (PLAN) - QUAN TRỌNG NHẤT */}
-              {/* Trang Roadmap (Các ô vuông Ngày 1, 2, 3...) */}
-              <Route path="/plan/:id" element={<StudyPlan />} />
-              
-              {/* Trang chi tiết bài học (Học tập, Trắc nghiệm, Chat AI) */}
-              <Route path="/plan/:id/lesson/:dayNumber" element={<LessonView />} />
+  // Nếu chưa đăng nhập -> Đá về trang Auth
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
-              {/* Trí tuệ nhân tạo & Công cụ */}
-              <Route path="/ai-chat" element={<AIChat />} />
-              <Route path="/generate" element={<Generator />} />
-              <Route path="/market" element={<Marketplace />} />
+  // Nếu yêu cầu vai trò cụ thể nhưng user không khớp vai trò -> Đá về trang chủ
+  if (allowedRole && role !== allowedRole) {
+    return <Navigate to="/" replace />;
+  }
 
-              {/* Quản lý & Lịch sử */}
-              <Route path="/history" element={<QuizHistory />} />
-              <Route path="/history/detail/:quizId/:number" element={<AttemptDetail />} />
-              <Route path="/quiz/:id/edit" element={<QuizEdit />} />
-
-            </Route>
-
-            {/* Fallback - Có thể thêm trang 404 ở đây */}
-          </Routes>
-        </div>
-      </Router>
-    </ThemeProvider>
-  );
+  return <>{children}</>;
 };
+
+/**
+ * 2. Component chứa nội dung định tuyến (AppContent)
+ * Tách riêng để có thể sử dụng hook useAuth() bên trong AuthProvider
+ */
+function AppRoutes() {
+  const { role, user } = useAuth();
+
+  return (
+    <Routes>
+      {/* ROUTE PUBLIC: TRANG LOGIN / REGISTER */}
+      {/* Nếu đã login rồi mà vào /auth thì tự đá về trang chủ index */}
+      <Route path="/auth" element={!user ? <Auth /> : <Navigate to="/" replace />} />
+
+      {/* NHÓM ROUTE CẦN ĐĂNG NHẬP (Bọc trong MainLayout và ProtectedRoute) */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      }>
+        
+        {/* Trang Index: Tự động điều hướng theo Role ngay khi vào localhost:3000 */}
+        <Route index element={
+          role === 'instructor' 
+            ? <Navigate to="/instructor/students" replace /> 
+            : <Navigate to="/dashboard" replace />
+        } />
+
+        {/* Trang thông tin cá nhân (Dùng chung 2 role) */}
+        <Route path="profile" element={<Profile />} />
+
+        {/* --- NHÓM ROUTE DÀNH CHO NGƯỜI HỌC (LEARNER) --- */}
+        <Route path="dashboard" element={
+          <ProtectedRoute allowedRole="learner"><LearnerDashboard /></ProtectedRoute>
+        } />
+        <Route path="create-plan" element={
+          <ProtectedRoute allowedRole="learner"><CreatePlanFromDoc /></ProtectedRoute>
+        } />
+        <Route path="my-plans" element={
+          <ProtectedRoute allowedRole="learner"><MyPlans /></ProtectedRoute>
+        } />
+        <Route path="plan/:id" element={
+          <ProtectedRoute allowedRole="learner"><PlanDetail /></ProtectedRoute>
+        } />
+        <Route path="plan/:id/lesson/:dayNumber" element={
+          <ProtectedRoute allowedRole="learner"><LessonView /></ProtectedRoute>
+        } />
+        <Route path="documents" element={
+          <ProtectedRoute allowedRole="learner"><Documents /></ProtectedRoute>
+        } />
+
+        {/* --- NHÓM ROUTE DÀNH CHO GIÁO VIÊN (INSTRUCTOR) --- */}
+        <Route path="instructor/students" element={
+          <ProtectedRoute allowedRole="instructor"><StudentList /></ProtectedRoute>
+        } />
+        <Route path="instructor/shared" element={
+          <ProtectedRoute allowedRole="instructor"><SharedPlans /></ProtectedRoute>
+        } />
+        <Route path="instructor/student-plan/:planId" element={
+          <ProtectedRoute allowedRole="instructor"><StudentPlanView /></ProtectedRoute>
+        } />
+
+      </Route>
+
+      {/* Bẫy lỗi 404 hoặc đường dẫn lạ -> Quay về trang chủ */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+/**
+ * 3. COMPONENT GỐC (Main Entry)
+ */
+function App() {
+  return (
+    <BrowserRouter>
+      {/* 
+          QUAN TRỌNG: AuthProvider phải nằm trong BrowserRouter 
+          thì mới dùng được hook điều hướng bên trong nó (nếu cần).
+      */}
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
 
 export default App;

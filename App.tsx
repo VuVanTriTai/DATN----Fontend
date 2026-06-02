@@ -5,42 +5,44 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 // Layouts
 import MainLayout from './components/layout/MainLayout';
 
-// Pages - Auth & Profile
+// Pages
 import Auth from './pages/auth/Auth';
 import Profile from './pages/profile/Profile';
-
-// Pages - Learner (Người học)
 import LearnerDashboard from './pages/learner/Dashboard';
 import MyPlans from './pages/learner/MyPlans';
 import PlanDetail from './pages/learner/PlanDetail';
 import Documents from './pages/learner/Documents';
 import CreatePlanFromDoc from './pages/learner/CreateCourse/CreatePlanFromDoc'; 
 import LessonView from './pages/learner/LessonView';
-
-// Pages - Instructor (Người hướng dẫn)
 import StudentList from './pages/instructor/StudentList';
 import SharedPlans from './pages/instructor/SharedPlans';
 import StudentPlanView from './pages/instructor/StudentPlanView';
-
+import InstructorCourses from './pages/instructor/InstructorCourses';
+import Market from './pages/learner/Market';
+import InstructorDirectory from './pages/learner/InstructorDirectory';
+import TeachingFields from './pages/instructor/TeachingFields';
+import InstructorMarketListings from './pages/instructor/InstructorMarketListings';
+import LearnerImportedCourses from './pages/learner/LearnerImportedCourses';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/Dashboard';
+import UserManagement from './pages/admin/UserManagement';
+import CourseManagement from './pages/admin/CourseManagement';
 /**
- * 1. Component Bảo vệ Tuyến đường (Hỗ trợ phân loại Learner/Instructor)
+ * 1. Component Bảo vệ Tuyến đường
  */
 const ProtectedRoute = ({ 
   children, 
   allowedRole 
 }: { 
   children: React.ReactNode, 
-  allowedRole?: 'learner' | 'instructor' 
+  allowedRole?: 'learner' | 'instructor' | 'admin'
 }) => {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
 
-  // Nếu chưa đăng nhập -> Đá về trang Auth
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
+  if (!user) return <Navigate to="/auth" replace />;
 
-  // Nếu yêu cầu vai trò cụ thể nhưng user không khớp vai trò -> Đá về trang chủ
-  if (allowedRole && role !== allowedRole) {
+  // Kiểm tra xem trong mảng role của user có quyền này không
+  if (allowedRole && !user.role.includes(allowedRole)) {
     return <Navigate to="/" replace />;
   }
 
@@ -48,84 +50,85 @@ const ProtectedRoute = ({
 };
 
 /**
- * 2. Component chứa nội dung định tuyến (AppContent)
- * Tách riêng để có thể sử dụng hook useAuth() bên trong AuthProvider
+ * 2. AppContent: Tách riêng để sử dụng được hook useAuth
  */
 function AppRoutes() {
-  const { role, user } = useAuth();
+  const { user, activeMode } = useAuth();
 
   return (
     <Routes>
-      {/* ROUTE PUBLIC: TRANG LOGIN / REGISTER */}
-      {/* Nếu đã login rồi mà vào /auth thì tự đá về trang chủ index */}
+      {/* Route công khai */}
       <Route path="/auth" element={!user ? <Auth /> : <Navigate to="/" replace />} />
 
-      {/* NHÓM ROUTE CẦN ĐĂNG NHẬP (Bọc trong MainLayout và ProtectedRoute) */}
+      {/* Nhóm Route bảo vệ */}
       <Route path="/" element={
         <ProtectedRoute>
           <MainLayout />
         </ProtectedRoute>
       }>
         
-        {/* Trang Index: Tự động điều hướng theo Role ngay khi vào localhost:3000 */}
+        {/* Trang chủ điều hướng theo activeMode */}
         <Route index element={
-          role === 'instructor' 
-            ? <Navigate to="/instructor/students" replace /> 
-            : <Navigate to="/dashboard" replace />
+          user?.role.includes('admin')
+            ? <Navigate to="/admin/dashboard" replace />
+            : (activeMode === 'instructor' && user?.role.includes('instructor'))
+              ? <Navigate to="/instructor/courses" replace /> 
+              : <Navigate to="/dashboard" replace />
         } />
 
-        {/* Trang thông tin cá nhân (Dùng chung 2 role) */}
         <Route path="profile" element={<Profile />} />
 
-        {/* --- NHÓM ROUTE DÀNH CHO NGƯỜI HỌC (LEARNER) --- */}
-        <Route path="dashboard" element={
-          <ProtectedRoute allowedRole="learner"><LearnerDashboard /></ProtectedRoute>
+        {/* Routes cho Người học */}
+        <Route path="dashboard" element={<ProtectedRoute allowedRole="learner"><LearnerDashboard /></ProtectedRoute>} />
+        <Route path="create-plan" element={<ProtectedRoute allowedRole="learner"><CreatePlanFromDoc /></ProtectedRoute>} />
+        <Route path="my-plans" element={<ProtectedRoute allowedRole="learner"><MyPlans /></ProtectedRoute>} />
+        <Route path="plan/:id" element={<ProtectedRoute allowedRole="learner"><PlanDetail /></ProtectedRoute>} />
+        <Route path="plan/:id/lesson/:dayNumber" element={<ProtectedRoute allowedRole="learner"><LessonView /></ProtectedRoute>} />
+        <Route path="documents" element={<ProtectedRoute allowedRole="learner"><Documents /></ProtectedRoute>} />
+        <Route path="market" element={
+          <ProtectedRoute allowedRole="learner"><Market /></ProtectedRoute>
         } />
-        <Route path="create-plan" element={
-          <ProtectedRoute allowedRole="learner"><CreatePlanFromDoc /></ProtectedRoute>
+        <Route path="my-imports" element={
+          <ProtectedRoute allowedRole="learner"><LearnerImportedCourses /></ProtectedRoute>
         } />
-        <Route path="my-plans" element={
-          <ProtectedRoute allowedRole="learner"><MyPlans /></ProtectedRoute>
+        <Route path="shared-plans" element={
+          <ProtectedRoute allowedRole="learner"><SharedPlans /></ProtectedRoute>
         } />
-        <Route path="plan/:id" element={
-          <ProtectedRoute allowedRole="learner"><PlanDetail /></ProtectedRoute>
+        <Route path="instructors" element={
+          <ProtectedRoute allowedRole="learner"><InstructorDirectory /></ProtectedRoute>
         } />
-        <Route path="plan/:id/lesson/:dayNumber" element={
-          <ProtectedRoute allowedRole="learner"><LessonView /></ProtectedRoute>
-        } />
-        <Route path="documents" element={
-          <ProtectedRoute allowedRole="learner"><Documents /></ProtectedRoute>
-        } />
-
-        {/* --- NHÓM ROUTE DÀNH CHO GIÁO VIÊN (INSTRUCTOR) --- */}
-        <Route path="instructor/students" element={
-          <ProtectedRoute allowedRole="instructor"><StudentList /></ProtectedRoute>
-        } />
-        <Route path="instructor/shared" element={
-          <ProtectedRoute allowedRole="instructor"><SharedPlans /></ProtectedRoute>
-        } />
-        <Route path="instructor/student-plan/:planId" element={
-          <ProtectedRoute allowedRole="instructor"><StudentPlanView /></ProtectedRoute>
-        } />
-
+        {/* Routes cho Giảng viên */}
+        
+        <Route path="instructor/students" element={<ProtectedRoute allowedRole="instructor"><StudentList /></ProtectedRoute>} />
+        <Route path="instructor/courses" element={<ProtectedRoute allowedRole="instructor"><InstructorCourses /></ProtectedRoute>} />
+        <Route path="instructor/teaching-fields" element={<ProtectedRoute allowedRole="instructor"><TeachingFields /></ProtectedRoute>} />
+        <Route path="instructor/market-listings" element={<ProtectedRoute allowedRole="instructor"><InstructorMarketListings /></ProtectedRoute>} />
+        <Route path="instructor/course/:planId" element={<ProtectedRoute allowedRole="instructor"><StudentPlanView /></ProtectedRoute>} />
       </Route>
 
-      {/* Bẫy lỗi 404 hoặc đường dẫn lạ -> Quay về trang chủ */}
+      {/* ── ADMIN ROUTES (Layout riêng, không dùng MainLayout) ── */}
+      <Route path="/admin" element={
+        <ProtectedRoute allowedRole="admin">
+          <AdminLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="users"     element={<UserManagement />} />
+        <Route path="courses"   element={<CourseManagement />} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
 /**
- * 3. COMPONENT GỐC (Main Entry)
+ * 3. Component Gốc
  */
 function App() {
   return (
     <BrowserRouter>
-      {/* 
-          QUAN TRỌNG: AuthProvider phải nằm trong BrowserRouter 
-          thì mới dùng được hook điều hướng bên trong nó (nếu cần).
-      */}
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>

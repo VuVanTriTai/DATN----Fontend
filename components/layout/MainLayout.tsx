@@ -1,17 +1,23 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-//import sidebar from './Sidebar';
-import Sidebar from '@/components/layout/Sidebar';
+import Sidebar from './Sidebar';
 
 const MainLayout: React.FC = () => {
   return (
-    <div className="flex min-h-screen bg-[#0f172a]">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
+    <div className="flex h-screen bg-[#0d1117] overflow-hidden">
+      {/* Sidebar cố định phía bên trái */}
+      <div className="flex-shrink-0 z-40">
+        <Sidebar />
+      </div>
+      
+      {/* Vùng nội dung có thể cuộn bên phải */}
+      <main className="flex-1 overflow-y-auto relative bg-[#0d1117]">
+        <div className="min-h-full">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
 };
 
-export default MainLayout;
+export default MainLayout;

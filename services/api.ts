@@ -31,6 +31,7 @@ export const api = {
   auth: {
     login: (data: any) => axiosInstance.post("/auth/login", data).then(res => res.data),
     register: (data: any) => axiosInstance.post("/auth/register", data).then(res => res.data),
+    googleLogin: (token: string) => axiosInstance.post("/auth/google-login", { token }).then(res => res.data),
     getMe: () => axiosInstance.get("/auth/me").then(res => res.data),
     getInstructors: () => axiosInstance.get("/auth/instructors").then(res => res.data), // Lấy ds giáo viên cho Learner chọn
     updateProfile: (data: any) => axiosInstance.put("/users/profile", data).then(res => res.data),
@@ -51,19 +52,143 @@ export const api = {
     getMyPlans: () => axiosInstance.get("/plan/me").then(res => res.data),
     getDetail: (id: string) => axiosInstance.get(`/plan/${id}`).then(res => res.data),
     getLesson: (id: string, day: string | number) => axiosInstance.get(`/plan/${id}/lesson/${day}`).then(res => res.data),
-    delete: (id: string) => axiosInstance.delete(`/plan/${id}`).then(res => res.data),
+    // HÀM XÓA: Gửi request DELETE tới /api/plan/:id
+    delete: (id: string) => 
+        axiosInstance.delete(`/plan/${id}`).then(res => res.data),
+    // HÀM CẬP NHẬT GIÁO VIÊN: Gửi request PUT tới /api/plan/:id/instructor
     updateInstructor: (id: string, instructorId: string) => 
         axiosInstance.put(`/plan/${id}/instructor`, { instructorId }).then(res => res.data),
     share: (id: string) => axiosInstance.post(`/plan/${id}/share`).then(res => res.data),
+    shareToMarket: (id: string, data: { categories: string[], level: string, tags: string[] }) => 
+        axiosInstance.post(`/plan/${id}/share-market`, data).then(res => res.data),
+    getResults: (id: string) => axiosInstance.get(`/plan/${id}/results`).then(res => res.data),
+    // Tìm user theo email/tên để chia sẻ lộ trình
+    searchUser: (email: string) =>
+        axiosInstance.get(`/plan/search-user?email=${encodeURIComponent(email)}`).then(res => res.data),
+    // Chia sẻ riêng tư cho 1 cá nhân (gửi targetUserId)
+    sharePrivate: (id: string, targetUserId: string) => 
+        axiosInstance.post(`/plan/${id}/share-private`, { targetUserId }).then(res => res.data),
+    // Cập nhật hàm analyze nhận đủ 4 tham số
+    analyze: (
+      text: string, 
+      goals: { focus: string; depth: string }, 
+      days: number, 
+      metadata?: any
+    ) => axiosInstance.post("/plan/analyze", { 
+      text, 
+      learningGoals: goals, // Key này phải khớp với bóc tách ở Backend
+      days, 
+      metadata 
+    }).then(res => res.data),
+    
+    // Lấy danh sách lộ trình người khác chia sẻ cho mình
+    getSharedWithMe: () => 
+        axiosInstance.get("/plan/shared/me").then(res => res.data),
+
+
+  
+
+  },
+  market: {
+    // Lấy danh sách khóa học (hỗ trợ filter search, category, level, instructorSearch)
+    getCourses: (params: any) =>
+      axiosInstance.get("/market/courses", { params }).then(res => res.data),
+    getPreview: (id: string) =>
+      axiosInstance.get(`/market/courses/${id}/preview`).then(res => res.data),
+    importCourse: (id: string) =>
+      axiosInstance.post(`/market/courses/${id}/import`).then(res => res.data),
+    // Lấy khóa học public của 1 giảng viên cụ thể
+    getCoursesByInstructor: (instructorId: string) =>
+      axiosInstance.get(`/market/instructor/${instructorId}/courses`).then(res => res.data),
+    // Instructor: Lấy danh sách khóa học của mình đang trên market
+    getMyListings: () =>
+      axiosInstance.get("/market/my-listings").then(res => res.data),
+    // Instructor: Gỡ khóa học khỏi market
+    unlistCourse: (id: string) =>
+      axiosInstance.patch(`/market/courses/${id}/unlist`).then(res => res.data),
+    // Learner: Lấy danh sách khoá học đã import từ Market về kho cá nhân
+    getMyImports: () =>
+      axiosInstance.get("/market/my-imports").then(res => res.data),
+    // Learner: Xoá khoá học đã import khỏi kho cá nhân
+    removeImport: (id: string) =>
+      axiosInstance.delete(`/market/my-imports/${id}`).then(res => res.data),
+  },
+
+  // ── THƯ MỤC GIÁO VIÊN (Instructor Directory) ──────────────────────────────
+  instructorDirectory: {
+    // Lấy danh sách lĩnh vực hệ thống hỗ trợ
+    getFields: () =>
+      axiosInstance.get("/instructor-directory/fields").then(r => r.data),
+
+    // Giáo viên lấy hồ sơ của mình
+    getMyProfile: () =>
+      axiosInstance.get("/instructor-directory/me").then(r => r.data),
+
+    // Giáo viên cập nhật lĩnh vực + hồ sơ
+    updateMyFields: (data: { teachingFields: string[]; specialization?: string; bio?: string }) =>
+      axiosInstance.put("/instructor-directory/my-fields", data).then(r => r.data),
+
+    // Học viên xem danh sách giáo viên
+    getList: (params?: { field?: string; sort?: string; search?: string }) =>
+      axiosInstance.get("/instructor-directory", { params }).then(r => r.data),
+
+    // Học viên đánh giá giáo viên
+    rate: (instructorId: string, data: { stars: number; comment?: string }) =>
+      axiosInstance.post(`/instructor-directory/${instructorId}/rate`, data).then(r => r.data),
+
+    // Lấy đánh giá của mình cho 1 giáo viên
+    getMyRating: (instructorId: string) =>
+      axiosInstance.get(`/instructor-directory/${instructorId}/my-rating`).then(r => r.data),
+
+    // Lấy tất cả đánh giá của 1 giáo viên
+    getRatings: (instructorId: string) =>
+      axiosInstance.get(`/instructor-directory/${instructorId}/ratings`).then(r => r.data),
   },
 
   // --- DÀNH CHO GIÁO VIÊN (INSTRUCTOR) ---
   instructor: {
-    getStudents: () => axiosInstance.get("/enrollment/my-students").then(res => res.data),
+   // Nếu bạn có trang danh sách học viên chung:
+    getStudents: () => 
+        axiosInstance.get("/instructor/my-students").then(res => res.data),
     getStudentProgress: (studentId: string) => axiosInstance.get(`/instructor/student/${studentId}/progress`).then(res => res.data),
-    gradeAssignment: (submissionId: string, data: { score: number, comment: string }) => 
-        axiosInstance.post(`/assignment/grade/${submissionId}`, data).then(res => res.data),
+    
+    // 1. Lấy danh sách các lộ trình mà tôi đang hướng dẫn
+  getMyCourses: () => axiosInstance.get("/instructor/my-courses").then(res => res.data),
+// 2. Lấy thông số tổng quan của 1 khóa học (số học viên, tiến độ tb...)
+  getCourseStats: (planId: string) => axiosInstance.get(`/instructor/course/${planId}/stats`).then(res => res.data),
+
+  // 3. Lấy danh sách học viên của 1 khóa học cụ thể
+  getCourseStudents: (planId: string) => axiosInstance.get(`/instructor/course/${planId}/students`).then(res => res.data),
+  
+  // 4. Lấy chi tiết bài tập/tiến độ của 1 học viên trong 1 khóa học
+  getStudentDetail: (planId: string, studentId: string) => 
+      axiosInstance.get(`/instructor/course/${planId}/student/${studentId}`).then(res => res.data),
+
+  // 3. (Mở rộng) Chấm điểm bài tập
+    gradeAssignment: (assignmentId: string, data: { score: number; feedback: string }) => 
+        axiosInstance.put(`/assignment/grade/${assignmentId}`, data).then(res => res.data),
+
+updateLesson: (lessonId: string, data: any) => 
+    axiosInstance.put(`/instructor/lesson/${lessonId}`, data).then(res => res.data),
+  saveLessonDraft: (lessonId: string, data: any) =>
+    axiosInstance.post(`/instructor/lesson/${lessonId}/draft`, data).then(res => res.data),
+  sendBackToStudent: (planId: string) => 
+    axiosInstance.post(`/instructor/course/${planId}/send-back`).then(res => res.data),
   },
+
+  // --- QUẢN LÝ BÀI TẬP (ASSIGNMENT) ---
+  assignment: {
+    // Học viên nộp bài tập (có hỗ trợ upload file)
+    submit: (data: FormData) => 
+      axiosInstance.post("/assignment/submit", data, { headers: { "Content-Type": "multipart/form-data" } }).then(res => res.data),
+    // Học viên (hoặc giảng viên) yêu cầu AI chấm điểm
+    aiGrade: (assignmentId: string) =>
+      axiosInstance.post(`/assignment/ai-grade/${assignmentId}`).then(res => res.data),
+    // Lấy bài nộp của tôi cho 1 bài học
+    getMine: (lessonId: string) =>
+      axiosInstance.get(`/assignment/lesson/${lessonId}/me`).then(res => res.data),
+  },
+
   // 5. TƯƠNG TÁC AI & FILE
   file: {
     extract: (file: File) => {
@@ -71,10 +196,26 @@ export const api = {
       formData.append("file", file);
       return axiosInstance.post("/file/extract", formData, { headers: { "Content-Type": "multipart/form-data" } }).then(res => res.data);
     },
+    upload: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return axiosInstance.post("/file/upload", formData, { headers: { "Content-Type": "multipart/form-data" } }).then(res => res.data);
+    },
+    
     getMyDocs: () => axiosInstance.get("/document").then(res => res.data),
+  deleteDocument: (id: string) => axiosInstance.delete(`/document/${id}`).then(res => res.data),
+
+  
+  
   },
+
   ai: {
-    chat: (question: string, planId: string) => axiosInstance.post("/ai/chat-doc", { question, planId }).then(res => res.data),
+    chat: (
+      question: string,
+      planId: string,
+      history: Array<{ role: string; content: string }> = [],
+      lessonContent?: string
+    ) => axiosInstance.post("/ai/chat-doc", { question, planId, history, lessonContent }).then(res => res.data),
   },
   // 7. HỆ THỐNG TRẮC NGHIỆM (QUIZ)
   quiz: {
@@ -164,5 +305,35 @@ export const api = {
       const response = await axiosInstance.get("/quiz/search", { params: { keyword } });
       return response.data;
     }
+  },
+
+  // 8. ADAPTIVE LEARNING QUIZ ─────────────────────────────────────────────────
+  lessonQuiz: {
+    /**
+     * Sinh pool 20 câu hỏi RAG cho bài học (gọi sau khi tạo khoá học)
+     */
+    generatePool: (lessonId: string) =>
+      axiosInstance.post(`/lesson-quiz/${lessonId}/generate-pool`).then(r => r.data),
+
+    /**
+     * Lấy câu hỏi thích nghi theo trình độ (đáp án đã ẩn)
+     * numQuestions: số câu muốn lấy (mặc định 10)
+     */
+    getQuestions: (lessonId: string, numQuestions = 10) =>
+      axiosInstance.get(`/lesson-quiz/${lessonId}/questions`, { params: { numQuestions } }).then(r => r.data),
+
+    /**
+     * Nộp bài → nhận kết quả thích nghi
+     * answers: mảng index đáp án người dùng chọn
+     * action trả về: 'remedial' | 'normal' | 'advanced'
+     */
+    submitAdaptive: (lessonId: string, data: { planId: string; dayNumber: number; answers: { poolIndex: number; answer: number }[] | number[] }) =>
+      axiosInstance.post(`/lesson-quiz/${lessonId}/submit-adaptive`, data).then(r => r.data),
+
+    /**
+     * Lấy lịch sử điểm từng bài của khoá học
+     */
+    getLessonScores: (planId: string) =>
+      axiosInstance.get(`/lesson-quiz/scores/${planId}`).then(r => r.data),
   },
 };

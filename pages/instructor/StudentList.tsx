@@ -1,3 +1,7 @@
+// src/pages/instructor/StudentList.tsx
+// TRANG NÀY DÙNG ĐỂ HIỂN THỊ DANH SÁCH HỌC VIÊN MÀ GIẢNG VIÊN ĐANG HƯỚNG DẪN
+// HIỆN TẠI CHỈ LÀ KHUNG TRỐNG, CHƯA CÓ GÌ, SẼ PHÁT TRIỂN SAU KHI XONG PHẦN CHIA SẺ VÀ QUẢN LÝ HỌC VIÊN
+//có khả năng bị xoá
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { User, ChevronRight, MessageSquare } from 'lucide-react';

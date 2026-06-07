@@ -19,12 +19,12 @@ const Sidebar: React.FC = () => {
   const learnerMenu = [
     { icon: <LayoutDashboard size={20} />, label: 'Lộ trình học', path: '/dashboard' },
     { icon: <FilePlus size={20} />, label: 'Tạo lộ trình AI', path: '/create-plan' },
-    { icon: <BookOpen size={20} />, label: 'Lộ trình của tôi', path: '/my-plans' },
     { icon: <FolderOpen size={20} />, label: 'Tài liệu đã tải', path: '/documents' },
     { icon: <ShoppingBag size={20} />, label: 'Cửa hàng (Market)', path: '/market' },
     { icon: <DownloadCloud size={20} />, label: 'Khoá học đã lấy về', path: '/my-imports' },
     { icon: <Share2 size={20} />, label: 'Được chia sẻ', path: '/shared-plans' },
     { icon: <Users size={20} />, label: 'Thư mục Giáo viên', path: '/instructors' },
+    { icon: <Globe size={20} />, label: 'Quản lý Market', path: '/market-listings' },
   ];
 
   const instructorMenu = [

@@ -3,9 +3,10 @@ import { api } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Users, Play, GraduationCap, Clock,
-  TrendingUp, Plus, Star
+  TrendingUp, Plus, Star, Inbox, CheckCircle
 } from 'lucide-react';
 import CourseActionMenu from '../../components/shared/CourseActionMenu';
+import { useAuth } from '../../context/AuthContext';
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 const SkeletonCard = () => (
@@ -26,6 +27,8 @@ const SkeletonCard = () => (
 const InstructorCourses = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'submitted' | 'reviewed'>('submitted');
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const fetchCourses = async () => {
@@ -40,6 +43,35 @@ const InstructorCourses = () => {
   useEffect(() => { fetchCourses(); }, []);
 
   const totalStudents = courses.reduce((sum, c) => sum + (c.studentCount || 0), 0);
+
+  // Phân loại khoá học:
+  // - Học viên gửi: Khoá học được gán cho giáo viên, hiển thị bản gốc (pending) hoặc bản đang chỉnh sửa (teaching).
+  //   Để tránh trùng lặp trước khi chỉnh sửa, ta ẩn bản gốc (pending) nếu đã có bản sao đang dạy (teaching).
+  const studentSubmitted = courses.filter((c) => {
+    // Không hiển thị khoá học của chính giáo viên tự tạo làm chủ sở hữu
+    if (String(c.owner?._id || '') === String(user?.id || '')) return false;
+
+    if (c.status === 'teaching') return true;
+    if (c.status === 'pending') {
+      // Ẩn bản gốc (pending) nếu trong danh sách đang có bản sao đang chỉnh sửa (teaching)
+      const hasTeachingClone = courses.some(
+        (other) =>
+          other._id !== c._id &&
+          String(other.owner?._id || '') === String(c.owner?._id || '') &&
+          other.title === c.title &&
+          other.status === 'teaching'
+      );
+      return !hasTeachingClone;
+    }
+    return false;
+  });
+
+  // - Đã qua chỉnh sửa / Tự soạn: Khoá học đã duyệt hoàn tất (status === 'reviewed') hoặc do chính giáo viên sở hữu
+  const reviewedCourses = courses.filter(
+    (c) => c.status === 'reviewed' || String(c.owner?._id || '') === String(user?.id || '')
+  );
+
+  const displayCourses = activeTab === 'submitted' ? studentSubmitted : reviewedCourses;
 
   return (
     <div className="p-8 space-y-8 text-white min-h-screen">
@@ -78,12 +110,59 @@ const InstructorCourses = () => {
         </div>
       )}
 
+      {/* ── Tabs Switcher ── */}
+      <div className="flex items-center gap-6 border-b border-white/5 pb-px">
+        <button
+          onClick={() => setActiveTab('submitted')}
+          className={`flex items-center gap-2.5 pb-4 px-2 text-sm font-bold transition-all relative ${
+            activeTab === 'submitted'
+              ? 'text-purple-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Inbox size={16} />
+          <span>Học viên gửi</span>
+          <span className={`px-2 py-0.5 text-xs rounded-full font-black ${
+            activeTab === 'submitted'
+              ? 'bg-purple-500/20 text-purple-400'
+              : 'bg-white/5 text-slate-400'
+          }`}>
+            {studentSubmitted.length}
+          </span>
+          {activeTab === 'submitted' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('reviewed')}
+          className={`flex items-center gap-2.5 pb-4 px-2 text-sm font-bold transition-all relative ${
+            activeTab === 'reviewed'
+              ? 'text-purple-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <CheckCircle size={16} />
+          <span>Đã qua chỉnh sửa</span>
+          <span className={`px-2 py-0.5 text-xs rounded-full font-black ${
+            activeTab === 'reviewed'
+              ? 'bg-purple-500/20 text-purple-400'
+              : 'bg-white/5 text-slate-400'
+          }`}>
+            {reviewedCourses.length}
+          </span>
+          {activeTab === 'reviewed' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
+          )}
+        </button>
+      </div>
+
       {/* ── Course Grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {loading ? (
           Array(3).fill(0).map((_, i) => <SkeletonCard key={i} />)
-        ) : courses.length > 0 ? (
-          courses.map((course) => (
+        ) : displayCourses.length > 0 ? (
+          displayCourses.map((course) => (
             <div
               key={course._id}
               className="bg-[#0d1117] border border-white/5 hover:border-purple-500/30 rounded-[2rem] p-6 transition-all group shadow-xl relative overflow-hidden hover:-translate-y-0.5 duration-200"
@@ -99,14 +178,32 @@ const InstructorCourses = () => {
                   <div onClick={(e) => e.stopPropagation()}>
                     <CourseActionMenu plan={course} onRefresh={fetchCourses} />
                   </div>
-                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider border
-                    ${course.level === 'Hard'
-                      ? 'bg-red-500/10 text-red-400 border-red-500/15'
-                      : course.level === 'Medium'
-                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/15'
-                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15'}`}>
-                    {course.level || 'Medium'}
-                  </span>
+                  <div className="flex gap-2">
+                    {/* Status Badge */}
+                    {course.owner?._id !== user?.id && (
+                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider border ${
+                        course.status === 'reviewed'
+                          ? 'bg-purple-500/10 text-purple-400 border-purple-500/15'
+                          : course.status === 'teaching'
+                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/15'
+                          : 'bg-slate-500/10 text-slate-400 border-slate-500/15'
+                      }`}>
+                        {course.status === 'reviewed'
+                          ? 'Đã gửi học viên'
+                          : course.status === 'teaching'
+                          ? 'Đang chỉnh sửa'
+                          : 'Bản gốc'}
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider border
+                      ${course.level === 'Hard'
+                        ? 'bg-red-500/10 text-red-400 border-red-500/15'
+                        : course.level === 'Medium'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/15'
+                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15'}`}>
+                      {course.level || 'Medium'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Title */}
@@ -146,18 +243,32 @@ const InstructorCourses = () => {
         ) : (
           <div className="col-span-full py-20 text-center rounded-[2.5rem] border border-dashed border-white/8 space-y-5">
             <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto">
-              <BookOpen size={28} className="text-slate-600" />
+              {activeTab === 'submitted' ? (
+                <Inbox size={28} className="text-slate-500" />
+              ) : (
+                <CheckCircle size={28} className="text-slate-500" />
+              )}
             </div>
             <div>
-              <p className="text-slate-400 font-bold">Bạn chưa được giao hướng dẫn khoá học nào.</p>
-              <p className="text-slate-600 text-sm mt-1">Hãy tạo lộ trình để chia sẻ với học viên.</p>
+              <p className="text-slate-400 font-bold">
+                {activeTab === 'submitted'
+                  ? 'Không có khoá học học viên gửi đang chờ duyệt.'
+                  : 'Không có khoá học nào đã qua chỉnh sửa.'}
+              </p>
+              <p className="text-slate-500 text-sm mt-1">
+                {activeTab === 'submitted'
+                  ? 'Khi học viên đăng ký lộ trình của bạn làm hướng dẫn, nó sẽ xuất hiện ở đây.'
+                  : 'Hãy xem qua các lộ trình học viên gửi và hoàn tất chỉnh sửa để gửi lại.'}
+              </p>
             </div>
-            <button
-              onClick={() => navigate('/create-plan')}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-sm transition-all"
-            >
-              <Plus size={16} /> Tạo lộ trình ngay
-            </button>
+            {activeTab === 'reviewed' && (
+              <button
+                onClick={() => navigate('/create-plan')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-sm transition-all"
+              >
+                <Plus size={16} /> Tạo lộ trình ngay
+              </button>
+            )}
           </div>
         )}
       </div>

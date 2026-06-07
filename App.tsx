@@ -97,6 +97,9 @@ function AppRoutes() {
         <Route path="instructors" element={
           <ProtectedRoute allowedRole="learner"><InstructorDirectory /></ProtectedRoute>
         } />
+        <Route path="market-listings" element={
+          <ProtectedRoute allowedRole="learner"><InstructorMarketListings /></ProtectedRoute>
+        } />
         {/* Routes cho Giảng viên */}
         
         <Route path="instructor/students" element={<ProtectedRoute allowedRole="instructor"><StudentList /></ProtectedRoute>} />

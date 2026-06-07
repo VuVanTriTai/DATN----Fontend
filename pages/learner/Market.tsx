@@ -279,7 +279,7 @@ const Market = () => {
                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-inner">
                       {course.owner?.fullName?.[0] || 'U'}
                    </div>
-                   <div className="text-[10px] min-w-0">
+                   <div className="text-[10px] min-w-0 flex-1">
                       <p className="text-slate-500 font-bold uppercase tracking-tighter">Chia sẻ bởi</p>
                       <p className="text-slate-300 font-black truncate">{course.owner?.fullName}</p>
                       {course.owner?.email && (
@@ -287,6 +287,15 @@ const Market = () => {
                       )}
                    </div>
                 </div>
+
+                {course.instructorId && (
+                  <div className="flex items-center gap-2 px-3.5 py-2.5 bg-purple-500/10 border border-purple-500/20 rounded-2xl mt-[-8px]">
+                    <CheckCircle2 size={13} className="text-purple-400 shrink-0" />
+                    <span className="text-[10px] text-purple-300 font-medium truncate">
+                      Đã qua chỉnh sửa bởi: <strong className="font-bold">{course.instructorId.fullName}</strong>
+                    </span>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   <button 
@@ -328,9 +337,15 @@ const Market = () => {
                 <h3 className="text-2xl font-black text-white leading-tight">{selectedCourse?.title}</h3>
                 <p className="text-blue-500 text-xs font-black uppercase tracking-widest">Cấu trúc chi tiết các ngày</p>
                 {selectedCourse?.owner && (
-                  <p className="text-slate-500 text-xs flex items-center gap-1 mt-1">
-                    <User size={11}/> {selectedCourse.owner.fullName}
-                    {selectedCourse.owner.email && ` · ${selectedCourse.owner.email}`}
+                  <p className="text-slate-500 text-xs flex items-center gap-1.5 mt-1 font-medium">
+                    <User size={12} className="text-slate-500 shrink-0"/>
+                    <span>Chia sẻ bởi: <strong className="text-slate-300">{selectedCourse.owner.fullName}</strong></span>
+                  </p>
+                )}
+                {selectedCourse?.instructorId && (
+                  <p className="text-purple-400 text-xs flex items-center gap-1.5 mt-1.5 font-medium">
+                    <CheckCircle2 size={12} className="text-purple-400 shrink-0"/>
+                    <span>Đã qua chỉnh sửa bởi: <strong className="text-purple-300 font-bold">{selectedCourse.instructorId.fullName}</strong></span>
                   </p>
                 )}
               </div>

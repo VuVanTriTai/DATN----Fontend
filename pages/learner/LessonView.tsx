@@ -155,12 +155,23 @@ const LessonView = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        // Reset states to avoid showing data from the previous day
+        setQuizQuestions([]);
+        setSelectedAnswers({});
+        setQuizResult(null);
+        setAssignment(null);
+        setUploadFile(null);
+        setLoadingPool(false);
+
         const [planRes, lessonRes] = await Promise.all([
           api.plan.getDetail(id!),
           api.plan.getLesson(id!, dayNumber!),
         ]);
 
-        if (!lessonRes.success) return;
+        if (!lessonRes.success) {
+          setLoading(false);
+          return;
+        }
         const lessonData = lessonRes.data;
         setLesson(lessonData);
         setPlan(planRes.data.plan);
@@ -173,10 +184,12 @@ const LessonView = () => {
           }
         } catch (e) {}
 
+        // Set loading to false so the component renders the main container
+        setLoading(false);
+
         await _initQuizQuestions(lessonData);
       } catch (err) {
         console.error('[LessonView] fetchData:', err);
-      } finally {
         setLoading(false);
       }
     };
@@ -205,11 +218,15 @@ const LessonView = () => {
     // Đã có pool → dùng luôn
     if (lessonData.quizPool?.length > 0) {
       loadFromPool(lessonData.quizPool);
+      setLoadingPool(false);
       return;
     }
 
     // Bài đã completed → không cần tạo thêm
-    if (lessonData.status === 'completed') return;
+    if (lessonData.status === 'completed') {
+      setLoadingPool(false);
+      return;
+    }
 
     // Kích hoạt loading và gọi generate đúng 1 lần
     setLoadingPool(true);
@@ -739,6 +756,8 @@ const LessonView = () => {
     }
   };
 
+  const isGeneratingQuiz = loadingPool && quizQuestions.length === 0;
+
   return (
     <div className="flex h-screen bg-[#0f172a] text-white overflow-hidden">
 
@@ -763,52 +782,62 @@ const LessonView = () => {
           </div>
         </div>
 
-        {/* Tab Menu */}
-        <div className="flex gap-2 bg-[#1e293b]/80 backdrop-blur-md p-1.5 rounded-2xl w-fit mb-10 border border-slate-800 sticky top-0 z-10 shadow-xl">
-          {[
-            { id: 'study',      label: 'Học tập',       icon: <BookOpen size={16}/>      },
-            { id: 'important',  label: 'Nội dung chính', icon: <Star size={16}/>          },
-            { id: 'video',      label: 'Video',         icon: <Video size={16}/>         },
-            { id: 'assignment', label: 'Bài tập',       icon: <FileText size={16}/>      },
-            { id: 'quiz',       label: 'Trắc nghiệm',   icon: <CheckSquare size={16}/>   },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all
-                ${activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-            >
-              {tab.icon} {tab.label}
-            </button>
-          ))}
-        </div>
+        {isGeneratingQuiz ? (
+          <div className="max-w-xl mx-auto py-10">
+            <QuizGeneratingPanel dayNumber={dayNumber} />
+          </div>
+        ) : (
+          <>
+            {/* Tab Menu */}
+            <div className="flex gap-2 bg-[#1e293b]/80 backdrop-blur-md p-1.5 rounded-2xl w-fit mb-10 border border-slate-800 sticky top-0 z-10 shadow-xl">
+              {[
+                { id: 'study',      label: 'Học tập',       icon: <BookOpen size={16}/>      },
+                { id: 'important',  label: 'Nội dung chính', icon: <Star size={16}/>          },
+                { id: 'video',      label: 'Video',         icon: <Video size={16}/>         },
+                { id: 'assignment', label: 'Bài tập',       icon: <FileText size={16}/>      },
+                { id: 'quiz',       label: 'Trắc nghiệm',   icon: <CheckSquare size={16}/>   },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all
+                    ${activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </div>
 
-        {/* Nội dung tab */}
-        <div className="max-w-4xl">
-          {renderContent()}
-        </div>
+            {/* Nội dung tab */}
+            <div className="max-w-4xl">
+              {renderContent()}
+            </div>
+          </>
+        )}
 
         <div className="h-20" />
       </div>
 
       {/* RIGHT: AI CHAT SIDEBAR */}
-      <div className="w-[420px] border-l border-slate-800 bg-[#0f172a] hidden xl:flex flex-col">
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-[#1e293b]/20">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="font-black text-xs uppercase tracking-widest text-slate-400">Trợ lý tài liệu AI</span>
+      {!isGeneratingQuiz && (
+        <div className="w-[420px] border-l border-slate-800 bg-[#0f172a] hidden xl:flex flex-col">
+          <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-[#1e293b]/20">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="font-black text-xs uppercase tracking-widest text-slate-400">Trợ lý tài liệu AI</span>
+            </div>
+            <MessageCircle size={18} className="text-slate-600" />
           </div>
-          <MessageCircle size={18} className="text-slate-600" />
+          <div className="flex-1 overflow-hidden p-4">
+            <AIChatBox 
+              planId={id} 
+              lessonTitle={lesson?.title}
+              lessonContent={lesson?.content}
+              dayNumber={Number(dayNumber)}
+            />
+          </div>
         </div>
-        <div className="flex-1 overflow-hidden p-4">
-          <AIChatBox 
-            planId={id} 
-            lessonTitle={lesson?.title}
-            lessonContent={lesson?.content}
-            dayNumber={Number(dayNumber)}
-          />
-        </div>
-      </div>
+      )}
 
     </div>
   );

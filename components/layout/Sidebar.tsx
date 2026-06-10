@@ -6,7 +6,7 @@ import {
   Settings, LogOut, Share2, FolderOpen,
   ChevronDown, GraduationCap, School, Check,
   ShoppingBag, Star, Globe, DownloadCloud,
-  ChevronLeft, ChevronRight, Sparkles
+  ChevronLeft, ChevronRight, Sparkles, UserCheck
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -24,6 +24,7 @@ const Sidebar: React.FC = () => {
     { icon: <DownloadCloud size={20} />, label: 'Khoá học đã lấy về', path: '/my-imports' },
     { icon: <Share2 size={20} />, label: 'Được chia sẻ', path: '/shared-plans' },
     { icon: <Users size={20} />, label: 'Thư mục Giáo viên', path: '/instructors' },
+    { icon: <UserCheck size={20} />, label: 'Bạn bè', path: '/friends' },
     { icon: <Globe size={20} />, label: 'Quản lý Market', path: '/market-listings' },
   ];
 

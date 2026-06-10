@@ -80,7 +80,7 @@ const Dashboard = () => {
     let matchSource = false;
     if (sourceFilter === 'assigned') matchSource = isAssigned;
     else if (sourceFilter === 'self') matchSource = p.sourceType === 'self' && !isAssigned;
-    else if (sourceFilter === 'imported') matchSource = p.sourceType === 'shared_import';
+    else if (sourceFilter === 'imported') matchSource = p.sourceType === 'shared_import' || p.sourceType === 'imported';
     else matchSource = p.sourceType === sourceFilter;
     return matchSource && getStatus(p) === statusFilter;
   });

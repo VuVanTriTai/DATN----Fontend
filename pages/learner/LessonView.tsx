@@ -1,13 +1,208 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import {
   BookOpen, CheckSquare, Star, Trophy,
   MessageCircle, ArrowLeft, Loader2, CheckCircle,
-  AlertTriangle, Video, UploadCloud, Download, FileText
+  AlertTriangle, Video, UploadCloud, Download, FileText,
+  X, Sparkles, BookMarked, ExternalLink, RefreshCw
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import AIChatBox from '../../components/ai/AIChatBox';
+
+// ─── Low Score Modal ──────────────────────────────────────────────────────────
+interface SuggestedCourse {
+  _id: string;
+  title: string;
+  topic?: string;
+  level?: string;
+  categories?: string[];
+  owner?: { fullName: string; email: string };
+  duration?: number;
+}
+
+const LowScoreModal: React.FC<{
+  score: number;
+  total: number;
+  percentage: number;
+  lessonTitle?: string;
+  planTopic?: string;
+  onClose: () => void;
+  onGoToMarket: () => void;
+}> = ({ score, total, percentage, lessonTitle, planTopic, onClose, onGoToMarket }) => {
+  const [courses, setCourses]     = useState<SuggestedCourse[]>([]);
+  const [loading, setLoading]     = useState(true);
+
+  useEffect(() => {
+    const fetchSuggested = async () => {
+      try {
+        setLoading(true);
+        // Tìm khóa học gợi ý từ Market theo topic của bài học
+        const keyword = planTopic || lessonTitle || '';
+        const res = await api.market.getCourses({ search: keyword, limit: 4, page: 1 });
+        if (res.success && res.data?.courses?.length > 0) {
+          setCourses(res.data.courses);
+        } else {
+          // Fallback: lấy khóa học mới nhất từ Market
+          const fallback = await api.market.getCourses({ limit: 4, page: 1 });
+          if (fallback.success) setCourses(fallback.data?.courses || []);
+        }
+      } catch (e) {
+        console.error('LowScoreModal fetch error:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSuggested();
+  }, [planTopic, lessonTitle]);
+
+  const levelColor = (level?: string) => {
+    if (level === 'advanced') return 'text-red-400 bg-red-500/10 border-red-500/30';
+    if (level === 'intermediate') return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30';
+    return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+  };
+
+  const levelLabel = (level?: string) => {
+    if (level === 'advanced') return 'Nâng cao';
+    if (level === 'intermediate') return 'Trung bình';
+    return 'Cơ bản';
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(5,8,22,0.85)', backdropFilter: 'blur(12px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-b from-[#0f1e3a] to-[#0a0f1e] border border-orange-500/30 rounded-[2rem] shadow-2xl shadow-orange-900/20 animate-in zoom-in-95 duration-300">
+        {/* Glow decoration */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-orange-500/10 blur-3xl rounded-full pointer-events-none" />
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all z-10"
+        >
+          <X size={16} />
+        </button>
+
+        <div className="p-6 sm:p-8 space-y-6">
+          {/* Header */}
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-2xl shadow-lg shadow-orange-900/30">
+              📚
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-1">Kết quả bài kiểm tra</p>
+              <h2 className="text-xl sm:text-2xl font-black text-white leading-snug">
+                Hãy ôn lại trước khi tiếp tục!
+              </h2>
+              <p className="text-slate-400 text-sm mt-1">
+                Bạn đạt <span className="font-black text-orange-400">{score}/{total} câu ({percentage}%)</span>. Điểm chưa đủ 60% — đừng nản nhé!
+              </p>
+            </div>
+          </div>
+
+          {/* Score visual */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between text-[11px] font-black uppercase tracking-widest">
+              <span className="text-slate-500">Điểm của bạn</span>
+              <span className="text-orange-400">{percentage}% / 60% cần đạt</span>
+            </div>
+            <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-1000"
+                style={{
+                  width: `${percentage}%`,
+                  background: 'linear-gradient(to right, #f97316, #ef4444)'
+                }}
+              />
+            </div>
+            <div
+              className="h-0 border-0 border-t-2 border-dashed border-emerald-500/40 relative -mt-1.5"
+              style={{ marginLeft: '60%' }}
+            >
+              <span className="absolute left-0 -top-4 text-[9px] font-black text-emerald-500 whitespace-nowrap">Ngưỡng đạt (60%)</span>
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div className="flex items-start gap-3 p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl">
+            <Sparkles size={18} className="text-blue-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Bài học đã được mở khóa. Bạn có thể <strong className="text-white">đọc lại nội dung</strong>, ôn thêm tài liệu rồi thử lại bài quiz. Các khóa học dưới đây từ Market cũng có thể giúp bạn nắm vững kiến thức hơn!
+            </p>
+          </div>
+
+          {/* Suggested courses */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <BookMarked size={16} className="text-violet-400" />
+              <p className="text-xs font-black uppercase tracking-widest text-violet-400">Khoá học gợi ý từ Market</p>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-10 gap-3 text-slate-500">
+                <Loader2 size={20} className="animate-spin text-violet-400" />
+                <span className="text-sm font-bold">Đang tìm khóa học phù hợp...</span>
+              </div>
+            ) : courses.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-sm italic border border-dashed border-slate-800 rounded-2xl">
+                Chưa có khóa học phù hợp trên Market.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {courses.map((course) => (
+                  <div
+                    key={course._id}
+                    className="group p-4 bg-slate-900/60 border border-slate-800 hover:border-violet-500/50 rounded-2xl transition-all cursor-pointer hover:bg-slate-800/60 hover:shadow-lg hover:shadow-violet-900/10"
+                    onClick={onGoToMarket}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="font-bold text-sm text-white line-clamp-2 group-hover:text-violet-300 transition-colors leading-snug">
+                        {course.title}
+                      </p>
+                      <ExternalLink size={14} className="shrink-0 mt-0.5 text-slate-600 group-hover:text-violet-400 transition-colors" />
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
+                      {course.level && (
+                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${levelColor(course.level)}`}>
+                          {levelLabel(course.level)}
+                        </span>
+                      )}
+                      {course.duration && (
+                        <span className="text-[9px] text-slate-500 font-bold">{course.duration} ngày</span>
+                      )}
+                      {course.owner?.fullName && (
+                        <span className="text-[9px] text-slate-600 font-bold truncate">by {course.owner.fullName}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 px-6 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-sm border border-slate-700 transition-all flex items-center justify-center gap-2"
+            >
+              <RefreshCw size={16} /> Thử lại bài quiz
+            </button>
+            <button
+              onClick={onGoToMarket}
+              className="flex-1 py-3 px-6 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-2xl font-black text-sm shadow-lg shadow-violet-900/30 transition-all flex items-center justify-center gap-2"
+            >
+              <BookMarked size={16} /> Xem Market
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ─── Hằng số ─────────────────────────────────────────────────────────────────
 const QUESTIONS_PER_PAGE = 10;
@@ -142,13 +337,22 @@ const LessonView = () => {
   const [quizResult,       setQuizResult]       = useState<any>(null);
   const [submittingQuiz,   setSubmittingQuiz]   = useState(false);
   const [loadingPool,      setLoadingPool]      = useState(false);
+  const [quizFailed,       setQuizFailed]       = useState(false); // true khi AI sinh quiz thất bại
   const [currentPage,      setCurrentPage]      = useState(1);
-  
+
+  // Low-score modal state
+  const [showLowScoreModal, setShowLowScoreModal] = useState(false);
+
   // Assignment states
   const [assignment, setAssignment] = useState<any>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadingAssignment, setUploadingAssignment] = useState(false);
   const [gradingAssignment, setGradingAssignment] = useState(false);
+
+  const handleGoToMarket = useCallback(() => {
+    setShowLowScoreModal(false);
+    navigate('/market');
+  }, [navigate]);
 
   // ── Tải dữ liệu bài học ────────────────────────────────────────────────────
   useEffect(() => {
@@ -159,6 +363,7 @@ const LessonView = () => {
         setQuizQuestions([]);
         setSelectedAnswers({});
         setQuizResult(null);
+        setQuizFailed(false);
         setAssignment(null);
         setUploadFile(null);
         setLoadingPool(false);
@@ -254,6 +459,7 @@ const LessonView = () => {
     }
 
     console.warn('[LessonView] Quiz pool không sẵn sàng sau 60s.');
+    setQuizFailed(true);
     setLoadingPool(false);
   };
 
@@ -265,7 +471,10 @@ const LessonView = () => {
 
   // ── Nộp bài ───────────────────────────────────────────────────────────────
   const handleSubmitQuiz = async () => {
-    if (Object.keys(selectedAnswers).length < quizQuestions.length) {
+    if (quizQuestions.length === 0) {
+      const confirmBypass = window.confirm("Bài học này chưa có câu hỏi trắc nghiệm. Bạn có muốn bỏ qua bài quiz để hoàn thành ngày học này và mở khóa bài tiếp theo?");
+      if (!confirmBypass) return;
+    } else if (Object.keys(selectedAnswers).length < quizQuestions.length) {
       alert(`Vui lòng trả lời hết ${quizQuestions.length} câu hỏi!`);
       return;
     }
@@ -286,6 +495,10 @@ const LessonView = () => {
 
       if (res.success) {
         setQuizResult(res.data);
+        // Nếu quiz bị bỏ qua (pool rỗng) → không hiện modal điểm thấp
+        if (!res.data?.quizBypassed && (res.data?.percentage ?? 0) < 60) {
+          setShowLowScoreModal(true);
+        }
       }
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Lỗi khi nộp bài.';
@@ -445,6 +658,23 @@ const LessonView = () => {
               <QuizGeneratingPanel dayNumber={dayNumber} />
             )}
 
+            {/* Quiz sinh thất bại — Banner thông báo */}
+            {!loadingPool && quizFailed && quizQuestions.length === 0 && !quizResult && (
+              <div className="flex items-start gap-4 p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl animate-in fade-in">
+                <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-500/20 flex items-center justify-center text-xl">
+                  ⚠️
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-amber-300 text-sm">AI chưa tạo được câu hỏi cho ngày này</p>
+                  <p className="text-slate-400 text-xs mt-1 leading-relaxed">
+                    Có thể do lỗi tạm thời từ AI hoặc nội dung bài học quá ngắn. Bạn có thể{' '}
+                    <strong className="text-amber-300">thoát ra và vào lại ngày học này</strong>{' '}
+                    để thử tạo lại quiz, hoặc nhấn nút bên dưới để bỏ qua và mở khoá ngày tiếp theo.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Danh sách câu hỏi */}
             <div className="space-y-6">
               {quizQuestions.slice((currentPage - 1) * QUESTIONS_PER_PAGE, currentPage * QUESTIONS_PER_PAGE).map((q: any, pIdx: number) => {
@@ -580,10 +810,14 @@ const LessonView = () => {
               <button
                 onClick={handleSubmitQuiz}
                 disabled={submittingQuiz || loadingPool}
-                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-[1.5rem] font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+                className={`w-full py-5 text-white rounded-[1.5rem] font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 ${
+                  quizQuestions.length === 0
+                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-amber-900/30'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/30'
+                }`}
               >
                 {submittingQuiz ? <Loader2 className="animate-spin" /> : <CheckCircle size={24} />}
-                Nộp bài &amp; Hoàn thành Ngày {dayNumber}
+                {quizQuestions.length === 0 ? `Bỏ qua Quiz & Mở khoá Ngày ${Number(dayNumber) + 1}` : `Nộp bài & Hoàn thành Ngày ${dayNumber}`}
               </button>
             ) : (
               <button
@@ -755,10 +989,22 @@ const LessonView = () => {
         return null;
     }
   };
-
   const isGeneratingQuiz = loadingPool && quizQuestions.length === 0;
 
   return (
+    <React.Fragment>
+    {/* Low-Score Modal */}
+    {showLowScoreModal && quizResult && (
+      <LowScoreModal
+        score={quizResult.score}
+        total={quizResult.total}
+        percentage={quizResult.percentage}
+        lessonTitle={lesson?.title}
+        planTopic={plan?.topic || plan?.title}
+        onClose={() => setShowLowScoreModal(false)}
+        onGoToMarket={handleGoToMarket}
+      />
+    )}
     <div className="flex h-screen bg-[#0f172a] text-white overflow-hidden">
 
       {/* LEFT: CONTENT AREA */}
@@ -840,6 +1086,7 @@ const LessonView = () => {
       )}
 
     </div>
+    </React.Fragment>
   );
 };
 

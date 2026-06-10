@@ -5,7 +5,7 @@ import {
   BookOpen, UploadCloud, Award, Share2, 
   ChevronRight, Calendar, CheckCircle, Lock, 
   PlayCircle, UserCheck, BarChart3, 
-  FileText, Trash2, Download, RefreshCw, X, Search, Info, Star, Target, Loader2, GraduationCap
+  FileText, Trash2, Download, RefreshCw, X, Search, Info, Star, Target, Loader2, GraduationCap, Users, Send
 } from 'lucide-react';
 
 const PlanDetail = () => {
@@ -25,17 +25,56 @@ const PlanDetail = () => {
   const [showInstructorModal, setShowInstructorModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // States quản lý chia sẻ bạn bè
+  const [friends, setFriends] = useState<any[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [sharingFriendId, setSharingFriendId] = useState<string | null>(null);
+  const [friendSearchQuery, setFriendSearchQuery] = useState("");
+
   useEffect(() => {
     loadData();
     fetchInstructors();
   }, [id]);
 
-  // Tự động tải dữ liệu Thành tích khi chuyển Tab
+  // Tự động tải dữ liệu Thành tích hoặc Bạn bè khi chuyển Tab
   useEffect(() => {
     if (activeTab === 'result') {
       fetchResults();
+    } else if (activeTab === 'share') {
+      fetchFriends();
     }
   }, [activeTab]);
+
+  const fetchFriends = async () => {
+    try {
+      setLoadingFriends(true);
+      const res = await api.friends.getMyFriends();
+      if (res.success) {
+        setFriends(res.data || []);
+      }
+    } catch (err) {
+      console.error("Lỗi tải danh sách bạn bè:", err);
+    } finally {
+      setLoadingFriends(false);
+    }
+  };
+
+  const handleShareToFriend = async (friendId: string) => {
+    setSharingFriendId(friendId);
+    try {
+      const res = await api.plan.sharePrivate(id!, friendId);
+      if (res.success) {
+        alert("Đã chia sẻ lộ trình học thành công dưới dạng bản sao!");
+      } else {
+        alert(res.message || "Lỗi khi chia sẻ");
+      }
+    } catch (err: any) {
+      console.error("Lỗi chia sẻ:", err);
+      alert(err.response?.data?.message || "Lỗi khi chia sẻ lộ trình");
+    } finally {
+      setSharingFriendId(null);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -307,6 +346,124 @@ const PlanDetail = () => {
               </>
             ) : (
               <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" /></div>
+            )}
+          </div>
+        )}
+
+        {/* TAB CHIA SẺ */}
+        {activeTab === 'share' && (
+          <div className="bg-[#1e293b]/50 p-8 lg:p-10 rounded-[3rem] border border-slate-800 space-y-6 animate-in fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-black italic flex items-center gap-2">
+                  <Share2 className="text-blue-400" /> Chia sẻ lộ trình học
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Gửi tặng bản sao (clone) của lộ trình học tập này cho bạn bè của bạn.
+                </p>
+              </div>
+              
+              <div className="relative min-w-[280px]">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm bạn bè..."
+                  value={friendSearchQuery}
+                  onChange={(e) => setFriendSearchQuery(e.target.value)}
+                  className="w-full bg-[#0f172a] border border-slate-800 p-3 pl-11 rounded-2xl text-xs text-white outline-none focus:border-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            {loadingFriends ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-500">
+                <Loader2 className="animate-spin text-blue-500" size={32} />
+                <p className="text-xs font-bold uppercase tracking-wider">Đang tải danh sách bạn bè...</p>
+              </div>
+            ) : friends.length === 0 ? (
+              <div className="py-16 text-center bg-slate-900/30 rounded-[2rem] border border-slate-800 space-y-4">
+                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto text-slate-500">
+                  <Users size={32} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-slate-400 font-bold text-sm">Chưa có bạn bè nào</p>
+                  <p className="text-xs text-slate-500">Hãy kết nối bạn bè trước khi chia sẻ lộ trình.</p>
+                </div>
+                <button
+                  onClick={() => navigate('/friends')}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                >
+                  Đi tới trang Bạn bè
+                </button>
+              </div>
+            ) : (
+              (() => {
+                const filtered = friends.filter(({ friend }) => {
+                  const name = (friend?.fullName || "").toLowerCase();
+                  const email = (friend?.email || "").toLowerCase();
+                  const query = friendSearchQuery.toLowerCase();
+                  return name.includes(query) || email.includes(query);
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-12 text-center text-slate-500 text-xs font-bold">
+                      Không tìm thấy bạn bè nào khớp với từ khóa.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filtered.map(({ friendshipId, friend }) => {
+                      const initials = friend.fullName
+                        ? friend.fullName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+                        : '??';
+                      
+                      const isInstructor = friend.role?.includes('instructor');
+
+                      return (
+                        <div
+                          key={friendshipId}
+                          className="flex items-center justify-between p-4 bg-[#0f172a]/60 border border-slate-800 rounded-2xl hover:border-blue-500/20 transition-all group"
+                        >
+                          <div className="flex items-center gap-4 min-w-0">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white text-sm shrink-0 shadow-md">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-sm text-white truncate">{friend.fullName}</h4>
+                                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                  isInstructor
+                                    ? 'text-purple-400 bg-purple-500/10 border-purple-500/30'
+                                    : 'text-blue-400 bg-blue-500/10 border-blue-500/30'
+                                }`}>
+                                  {isInstructor ? 'Giảng viên' : 'Học viên'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 truncate">{friend.email}</p>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleShareToFriend(friend._id)}
+                            disabled={sharingFriendId === friend._id}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                          >
+                            {sharingFriendId === friend._id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Send size={12} />
+                            )}
+                            Gửi bản sao
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()
             )}
           </div>
         )}

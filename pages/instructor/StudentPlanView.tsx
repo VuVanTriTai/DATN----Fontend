@@ -24,6 +24,8 @@ const StudentPlanView = () => {
   // --- MODAL LƯU ---
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [draftLessonIds, setDraftLessonIds] = useState<Set<string>>(new Set()); // Theo dõi bài đã tạo bản nháp
+  const [isDeletingLesson, setIsDeletingLesson] = useState(false);
+  const [isAddingLesson, setIsAddingLesson] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -41,6 +43,53 @@ const StudentPlanView = () => {
       console.error("Lỗi tải dữ liệu:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddLessonAfter = async (afterDayNumber: number) => {
+    if (!planId) return;
+    setIsAddingLesson(true);
+    try {
+      const res = await api.instructor.addLesson(planId, afterDayNumber);
+      if (res.success) {
+        const statsRes = await api.instructor.getCourseStats(planId);
+        if (statsRes.success) {
+          setData(statsRes.data);
+          const newLesson = statsRes.data.lessons.find((l: any) => l._id === res.data._id);
+          if (newLesson) setSelectedLesson(newLesson);
+        }
+      }
+    } catch (err: any) {
+      alert("Lỗi thêm ngày học: " + (err.response?.data?.message || err.message));
+    } finally {
+      setIsAddingLesson(false);
+    }
+  };
+
+  const handleAddLesson = () => handleAddLessonAfter(data?.lessons?.length || 0);
+
+  const handleDeleteLesson = async () => {
+    if (!selectedLesson) return;
+    if (window.confirm(`⚠️ Bạn có chắc chắn muốn xóa bài học "${selectedLesson.title}" (Ngày ${selectedLesson.dayNumber}) khỏi lộ trình?\nCác ngày tiếp theo sẽ được tự động dồn lên.`)) {
+      setIsDeletingLesson(true);
+      try {
+        const res = await api.instructor.deleteLesson(selectedLesson._id);
+        if (res.success) {
+          const statsRes = await api.instructor.getCourseStats(planId!);
+          if (statsRes.success) {
+            setData(statsRes.data);
+            if (statsRes.data.lessons?.length > 0) {
+              setSelectedLesson(statsRes.data.lessons[0]);
+            } else {
+              setSelectedLesson(null);
+            }
+          }
+        }
+      } catch (err: any) {
+        alert("Lỗi xóa bài học: " + (err.response?.data?.message || err.message));
+      } finally {
+        setIsDeletingLesson(false);
+      }
     }
   };
 
@@ -195,20 +244,57 @@ const StudentPlanView = () => {
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Học viên: {data?.studentName}</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-          {data?.lessons?.map((l: any) => (
-            <button
-              key={l._id}
-              onClick={() => setSelectedLesson(l)}
-              className={`w-full p-4 rounded-2xl text-left transition-all border ${selectedLesson?._id === l._id ? 'bg-blue-600 border-blue-500 shadow-lg' : 'bg-[#0f172a] border-slate-800 hover:border-slate-700'}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] font-black uppercase opacity-60">Ngày {l.dayNumber}</p>
+        <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
+          {data?.lessons?.map((l: any, index: number) => (
+            <React.Fragment key={l._id}>
+              {/* Chèn trước Ngày 1 */}
+              {index === 0 && (
+                <div className="group flex justify-center py-0.5">
+                  <button
+                    onClick={() => handleAddLessonAfter(0)}
+                    disabled={isAddingLesson}
+                    title="Chèn bài học trước Ngày 1"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white px-2.5 py-1 rounded-lg text-[9px] font-bold border border-blue-500/20 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus size={10} /> Chèn vào đầu
+                  </button>
+                </div>
+              )}
+
+              {/* Bài học chính */}
+              <button
+                onClick={() => setSelectedLesson(l)}
+                className={`w-full p-4 rounded-2xl text-left transition-all border ${selectedLesson?._id === l._id ? 'bg-blue-600 border-blue-500 shadow-lg' : 'bg-[#0f172a] border-slate-800 hover:border-slate-700'}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] font-black uppercase opacity-60">Ngày {l.dayNumber}</p>
+                </div>
+                <p className="text-sm font-bold truncate">{l.title}</p>
+              </button>
+
+              {/* Chèn sau Ngày X */}
+              <div className="group flex justify-center py-0.5">
+                <button
+                  onClick={() => handleAddLessonAfter(l.dayNumber)}
+                  disabled={isAddingLesson}
+                  title={`Chèn bài học sau Ngày ${l.dayNumber}`}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white px-2.5 py-1 rounded-lg text-[9px] font-bold border border-blue-500/20 flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus size={10} /> Chèn sau Ngày {l.dayNumber}
+                </button>
               </div>
-              <p className="text-sm font-bold truncate">{l.title}</p>
-            </button>
+            </React.Fragment>
           ))}
         </div>
+
+        <button
+          onClick={handleAddLesson}
+          disabled={isAddingLesson}
+          className="w-full py-3.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 rounded-xl font-bold flex items-center justify-center gap-2 border border-blue-500/20 active:scale-95 transition-all text-xs uppercase tracking-widest disabled:opacity-50"
+        >
+          {isAddingLesson ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          Thêm ngày học
+        </button>
       </div>
 
       {/* --- VÙNG BIÊN TẬP PHẢI --- */}
@@ -233,14 +319,27 @@ const StudentPlanView = () => {
               </button>
             ))}
           </div>
-          <button
-            onClick={handleSaveLesson}
-            disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-black flex items-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 relative"
-          >
-            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-            Lưu bài học
-          </button>
+          <div className="flex items-center gap-3">
+            {selectedLesson && (
+              <button
+                onClick={handleDeleteLesson}
+                disabled={isDeletingLesson}
+                className="bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-400 px-6 py-2.5 rounded-xl font-black flex items-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isDeletingLesson ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                Xóa ngày học
+              </button>
+            )}
+
+            <button
+              onClick={handleSaveLesson}
+              disabled={isSaving}
+              className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-black flex items-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 relative"
+            >
+              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              Lưu bài học
+            </button>
+          </div>
         </div>
 
         {/* Modal Lưu */}

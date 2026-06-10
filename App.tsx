@@ -23,6 +23,7 @@ import InstructorDirectory from './pages/learner/InstructorDirectory';
 import TeachingFields from './pages/instructor/TeachingFields';
 import InstructorMarketListings from './pages/instructor/InstructorMarketListings';
 import LearnerImportedCourses from './pages/learner/LearnerImportedCourses';
+import Friends from './pages/learner/Friends';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import UserManagement from './pages/admin/UserManagement';
@@ -99,6 +100,9 @@ function AppRoutes() {
         } />
         <Route path="market-listings" element={
           <ProtectedRoute allowedRole="learner"><InstructorMarketListings /></ProtectedRoute>
+        } />
+        <Route path="friends" element={
+          <ProtectedRoute allowedRole="learner"><Friends /></ProtectedRoute>
         } />
         {/* Routes cho Giảng viên */}
         

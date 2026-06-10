@@ -4,10 +4,13 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 
 const Profile = () => {
-  const { user, activeMode } = useAuth();
+  const { user, activeMode, updateUserAndToken } = useAuth();
   
   // State quản lý thông tin cá nhân
   const [fullName, setFullName] = useState('');
+  const [specialization, setSpecialization] = useState('');
+  const [bio, setBio] = useState('');
+  const [teachingFields, setTeachingFields] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   // State quản lý đổi mật khẩu
@@ -18,24 +21,44 @@ const Profile = () => {
   });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  // State đăng ký giáo viên
+  const [isRegisteringInstructor, setIsRegisteringInstructor] = useState(false);
+
   // Khởi tạo dữ liệu ban đầu từ user context
   useEffect(() => {
     if (user) {
       setFullName(user.fullName || '');
+      if (user.instructorProfile) {
+        setSpecialization(user.instructorProfile.specialization || '');
+        setBio(user.instructorProfile.bio || '');
+        setTeachingFields(
+          Array.isArray(user.instructorProfile.teachingFields)
+            ? user.instructorProfile.teachingFields.join(', ')
+            : ''
+        );
+      }
     }
   }, [user]);
 
-  // Xử lý lưu thông tin cá nhân
+  // Xử lý lưu thông tin cá nhân (và thông tin giảng viên nếu có)
   const handleUpdateProfile = async () => {
     if (!fullName.trim()) return alert("Họ tên không được để trống");
     
     setIsUpdatingProfile(true);
     try {
-      const res = await api.auth.updateProfile({ fullName });
+      const data: any = { fullName };
+      if (user?.role.includes('instructor')) {
+        data.instructorProfile = {
+          specialization,
+          bio,
+          teachingFields: teachingFields.split(',').map(t => t.trim()).filter(Boolean)
+        };
+      }
+      
+      const res = await api.auth.updateProfile(data);
       if (res.success) {
         alert("Cập nhật thông tin thành công!");
-        // Lưu ý: Sau khi cập nhật, bạn có thể cần gọi hàm cập nhật user trong AuthContext
-        // hoặc yêu cầu người dùng F5 để thấy thay đổi.
+        updateUserAndToken(res.data);
       }
     } catch (err: any) {
       alert(err.response?.data?.message || "Lỗi cập nhật hồ sơ");
@@ -70,6 +93,28 @@ const Profile = () => {
     }
   };
 
+  // Xử lý đăng ký làm Giảng viên
+  const handleRegisterInstructor = async () => {
+    setIsRegisteringInstructor(true);
+    try {
+      const payload = {
+        specialization,
+        bio,
+        teachingFields: teachingFields.split(',').map(t => t.trim()).filter(Boolean)
+      };
+      
+      const res = await api.auth.registerInstructor(payload);
+      if (res.success) {
+        alert("Đăng ký làm Giảng viên thành công! Bây giờ bạn đã có vai trò Giảng viên và có thể chuyển đổi chế độ xem ở menu bên trái.");
+        updateUserAndToken(res.data.user, res.data.accessToken);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Lỗi đăng ký vai trò giảng viên");
+    } finally {
+      setIsRegisteringInstructor(false);
+    }
+  };
+
   return (
     <div className="p-6 lg:p-10 max-w-5xl mx-auto space-y-10 text-white animate-in fade-in duration-500">
       <header className="space-y-1">
@@ -90,17 +135,24 @@ const Profile = () => {
               </div>
               
               <h2 className="text-xl font-bold text-white line-clamp-1">{user?.fullName}</h2>
-              <div className="mt-4 flex items-center justify-center gap-2">
-                {activeMode === 'instructor' ? (
+              <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+                {user?.role.includes('instructor') ? (
                   <span className="flex items-center gap-2 bg-purple-500/10 text-purple-400 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-purple-500/20">
                     <School size={14}/> Giảng viên
                   </span>
-                ) : (
+                ) : null}
+                {user?.role.includes('learner') && (
                   <span className="flex items-center gap-2 bg-blue-500/10 text-blue-400 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-500/20">
                     <GraduationCap size={14}/> Học viên
                   </span>
                 )}
               </div>
+              
+              {user?.role.includes('instructor') && (
+                <p className="text-[11px] text-slate-400 mt-3 italic">
+                  * Bạn có thể chuyển đổi sang giao diện Giảng viên từ thanh menu bên trái.
+                </p>
+              )}
             </div>
           </div>
 
@@ -151,6 +203,44 @@ const Profile = () => {
                    />
                 </div>
               </div>
+
+              {/* Thông tin bổ sung dành cho giảng viên */}
+              {user?.role.includes('instructor') && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Lĩnh vực chuyên môn</label>
+                    <input 
+                      type="text" 
+                      value={specialization}
+                      onChange={(e) => setSpecialization(e.target.value)}
+                      placeholder="Ví dụ: Khoa học máy tính, Ngôn ngữ Anh..." 
+                      className="w-full bg-[#0f172a] border border-slate-800 p-4 rounded-2xl text-white outline-none focus:border-blue-500 transition-all font-medium" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Lĩnh vực giảng dạy (Phân tách bằng dấu phẩy)</label>
+                    <input 
+                      type="text" 
+                      value={teachingFields}
+                      onChange={(e) => setTeachingFields(e.target.value)}
+                      placeholder="Ví dụ: React, Node.js, Python..." 
+                      className="w-full bg-[#0f172a] border border-slate-800 p-4 rounded-2xl text-white outline-none focus:border-blue-500 transition-all font-medium" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Tiểu sử / Giới thiệu bản thân</label>
+                    <textarea 
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      placeholder="Mô tả kinh nghiệm, thế mạnh giảng dạy của bạn..." 
+                      rows={3}
+                      className="w-full bg-[#0f172a] border border-slate-800 p-4 rounded-2xl text-white outline-none focus:border-blue-500 transition-all font-medium resize-none" 
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <button 
@@ -162,6 +252,66 @@ const Profile = () => {
               Lưu thay đổi
             </button>
           </div>
+
+          {/* Section: Đăng ký Giảng viên (Nếu chưa là Giảng viên) */}
+          {!user?.role.includes('instructor') && (
+            <div className="bg-[#1e293b] p-8 lg:p-10 rounded-[3rem] border border-slate-800 space-y-6 shadow-xl relative overflow-hidden group">
+              <div className="absolute inset-0 bg-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10 space-y-6">
+                <h2 className="text-xl font-black flex items-center gap-3 border-b border-slate-800 pb-4 text-purple-400">
+                  <School size={22}/> Đăng ký làm Giảng viên
+                </h2>
+                
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Mở rộng vai trò của bạn để tham gia xây dựng giáo trình học tập, quản lý bài tập học viên, chia sẻ các lộ trình chất lượng lên Market và tương tác giảng dạy.
+                </p>
+
+                <div className="grid gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Lĩnh vực chuyên môn</label>
+                    <input 
+                      type="text" 
+                      value={specialization}
+                      onChange={(e) => setSpecialization(e.target.value)}
+                      placeholder="Ví dụ: Khoa học máy tính, Thiết kế đồ họa..." 
+                      className="w-full bg-[#0f172a] border border-slate-800 p-4 rounded-2xl text-white outline-none focus:border-purple-500 transition-all font-medium" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Lĩnh vực giảng dạy (Phân tách bằng dấu phẩy)</label>
+                    <input 
+                      type="text" 
+                      value={teachingFields}
+                      onChange={(e) => setTeachingFields(e.target.value)}
+                      placeholder="Ví dụ: SQL, Python, UI/UX..." 
+                      className="w-full bg-[#0f172a] border border-slate-800 p-4 rounded-2xl text-white outline-none focus:border-purple-500 transition-all font-medium" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Tiểu sử / Giới thiệu bản thân</label>
+                    <textarea 
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      placeholder="Mô tả ngắn về kinh nghiệm và định hướng giảng dạy của bạn..." 
+                      rows={3}
+                      className="w-full bg-[#0f172a] border border-slate-800 p-4 rounded-2xl text-white outline-none focus:border-purple-500 transition-all font-medium resize-none" 
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleRegisterInstructor}
+                  disabled={isRegisteringInstructor}
+                  className="bg-purple-600 hover:bg-purple-500 text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 transition-all shadow-lg shadow-purple-900/20 active:scale-95 disabled:opacity-50"
+                >
+                  {isRegisteringInstructor ? <Loader2 className="animate-spin" size={18}/> : <School size={18}/>}
+                  Kích hoạt chức năng Giảng viên
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Section: Bảo mật */}
           <div className="bg-[#1e293b] p-8 lg:p-10 rounded-[3rem] border border-slate-800 space-y-6 shadow-xl">

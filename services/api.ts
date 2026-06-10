@@ -34,8 +34,9 @@ export const api = {
     googleLogin: (token: string) => axiosInstance.post("/auth/google-login", { token }).then(res => res.data),
     getMe: () => axiosInstance.get("/auth/me").then(res => res.data),
     getInstructors: () => axiosInstance.get("/auth/instructors").then(res => res.data), // Lấy ds giáo viên cho Learner chọn
-    updateProfile: (data: any) => axiosInstance.put("/users/profile", data).then(res => res.data),
-    changePassword: (data: any) => axiosInstance.post("/users/change-password", data).then(res => res.data),
+    updateProfile: (data: any) => axiosInstance.put("/auth/profile", data).then(res => res.data),
+    changePassword: (data: any) => axiosInstance.post("/auth/change-password", data).then(res => res.data),
+    registerInstructor: (data: any) => axiosInstance.post("/auth/register-instructor", data).then(res => res.data),
   },
 
   // 2. QUY TRÌNH TẠO LỘ TRÌNH AI (Learner Only)
@@ -168,12 +169,16 @@ export const api = {
     gradeAssignment: (assignmentId: string, data: { score: number; feedback: string }) => 
         axiosInstance.put(`/assignment/grade/${assignmentId}`, data).then(res => res.data),
 
-updateLesson: (lessonId: string, data: any) => 
+  updateLesson: (lessonId: string, data: any) => 
     axiosInstance.put(`/instructor/lesson/${lessonId}`, data).then(res => res.data),
   saveLessonDraft: (lessonId: string, data: any) =>
     axiosInstance.post(`/instructor/lesson/${lessonId}/draft`, data).then(res => res.data),
   sendBackToStudent: (planId: string) => 
     axiosInstance.post(`/instructor/course/${planId}/send-back`).then(res => res.data),
+  addLesson: (planId: string, afterDayNumber?: number) => 
+    axiosInstance.post(`/instructor/course/${planId}/lesson`, { afterDayNumber }).then(res => res.data),
+  deleteLesson: (lessonId: string) => 
+    axiosInstance.delete(`/instructor/lesson/${lessonId}`).then(res => res.data),
   },
 
   // --- QUẢN LÝ BÀI TẬP (ASSIGNMENT) ---
@@ -335,5 +340,40 @@ updateLesson: (lessonId: string, data: any) =>
      */
     getLessonScores: (planId: string) =>
       axiosInstance.get(`/lesson-quiz/scores/${planId}`).then(r => r.data),
+  },
+
+  // 9. BẠN BÈ ────────────────────────────────────────────────────────────────
+  friends: {
+    /** Lấy danh sách bạn bè đã kết nối */
+    getMyFriends: () =>
+      axiosInstance.get('/friends').then(r => r.data),
+
+    /** Lấy lời mời kết bạn đang chờ */
+    getRequests: () =>
+      axiosInstance.get('/friends/requests').then(r => r.data),
+
+    /** Tìm kiếm user theo email / tên */
+    search: (q: string) =>
+      axiosInstance.get('/friends/search', { params: { q } }).then(r => r.data),
+
+    /** Gửi lời mời kết bạn */
+    sendRequest: (userId: string) =>
+      axiosInstance.post(`/friends/request/${userId}`).then(r => r.data),
+
+    /** Chấp nhận lời mời */
+    acceptRequest: (friendshipId: string) =>
+      axiosInstance.put(`/friends/accept/${friendshipId}`).then(r => r.data),
+
+    /** Từ chối lời mời */
+    rejectRequest: (friendshipId: string) =>
+      axiosInstance.put(`/friends/reject/${friendshipId}`).then(r => r.data),
+
+    /** Hủy lời mời đã gửi */
+    cancelRequest: (userId: string) =>
+      axiosInstance.delete(`/friends/cancel/${userId}`).then(r => r.data),
+
+    /** Hủy kết bạn */
+    unfriend: (userId: string) =>
+      axiosInstance.delete(`/friends/${userId}`).then(r => r.data),
   },
 };

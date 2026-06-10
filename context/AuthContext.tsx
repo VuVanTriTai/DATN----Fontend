@@ -9,6 +9,11 @@ interface User {
   email: string;
   role: UserRole[]; // Một tài khoản có thể có nhiều vai trò
   avatar?: string;
+  instructorProfile?: {
+    specialization?: string;
+    bio?: string;
+    teachingFields?: string[];
+  };
 }
 
 interface AuthContextType {
@@ -17,6 +22,7 @@ interface AuthContextType {
   switchMode: (mode: UserRole) => void;
   login: (userData: User, token: string) => void;
   logout: () => void;
+  updateUserAndToken: (userData: any, token?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,25 +73,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 4. Hàm Chuyển đổi chế độ (Switch Mode)
   // Trong AuthContext.tsx, sửa hàm switchMode:
 
-const switchMode = (mode: UserRole) => {
-  // Kiểm tra xem user có thực sự sở hữu role đó không trước khi cho phép chuyển
-  if (user && user.role.includes(mode)) {
-    setActiveMode(mode);
-    localStorage.setItem('activeMode', mode);
-  } else {
-    alert("Tài khoản của bạn chưa đăng ký vai trò này!");
-    // Nếu không có quyền, ép về learner
-    setActiveMode('learner');
-    localStorage.setItem('activeMode', 'learner');
-  }
-};
+  const switchMode = (mode: UserRole) => {
+    // Kiểm tra xem user có thực sự sở hữu role đó không trước khi cho phép chuyển
+    if (user && user.role.includes(mode)) {
+      setActiveMode(mode);
+      localStorage.setItem('activeMode', mode);
+    } else {
+      alert("Tài khoản của bạn chưa đăng ký vai trò này!");
+      // Nếu không có quyền, ép về learner
+      setActiveMode('learner');
+      localStorage.setItem('activeMode', 'learner');
+    }
+  };
+
+  // 5. Hàm cập nhật thông tin user và token
+  const updateUserAndToken = (userData: any, token?: string) => {
+    const mappedUser: User = {
+      id: userData.id || userData._id || "",
+      fullName: userData.fullName || "",
+      email: userData.email || "",
+      role: userData.role || [],
+      avatar: userData.avatar,
+      instructorProfile: userData.instructorProfile
+    };
+    setUser(mappedUser);
+    localStorage.setItem('user', JSON.stringify(mappedUser));
+    if (token) {
+      localStorage.setItem('token', token);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       activeMode, 
       switchMode, 
       login, 
-      logout 
+      logout,
+      updateUserAndToken
     }}>
       {children}
     </AuthContext.Provider>

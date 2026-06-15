@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import {
@@ -26,6 +26,31 @@ const StudentPlanView = () => {
   const [draftLessonIds, setDraftLessonIds] = useState<Set<string>>(new Set()); // Theo dõi bài đã tạo bản nháp
   const [isDeletingLesson, setIsDeletingLesson] = useState(false);
   const [isAddingLesson, setIsAddingLesson] = useState(false);
+
+  const mdeOptions = useMemo(() => ({
+    spellChecker: false,
+    uploadImage: true,
+    imageUploadFunction: async (file: File, onSuccess: (url: string) => void, onError: (err: string) => void) => {
+      try {
+        const res = await api.file.upload(file);
+        if (res.success && res.fileUrl) {
+          onSuccess(res.fileUrl);
+        } else {
+          onError("Tải hình ảnh thất bại");
+        }
+      } catch (err) {
+        console.error("Image upload failed:", err);
+        onError("Lỗi khi tải ảnh lên");
+      }
+    },
+    toolbar: [
+      "bold", "italic", "heading", "|",
+      "quote", "unordered-list", "ordered-list", "|",
+      "link", "image", "table", "|",
+      "preview", "side-by-side", "fullscreen", "|",
+      "guide"
+    ] as any
+  }), []);
 
   useEffect(() => {
     fetchData();
@@ -229,6 +254,214 @@ const StudentPlanView = () => {
 
   return (
     <div className="flex h-screen bg-[#0f172a] text-white overflow-hidden">
+      <style>{`
+        /* EasyMDE Dark Mode Stylesheet */
+        .EasyMDEContainer .editor-toolbar {
+          background-color: #1e293b !important;
+          border: 1px solid #334155 !important;
+          border-bottom: none !important;
+          border-top-left-radius: 16px !important;
+          border-top-right-radius: 16px !important;
+          padding: 8px 12px !important;
+          opacity: 1 !important;
+        }
+
+        .EasyMDEContainer .editor-toolbar button {
+          color: #94a3b8 !important;
+          border-radius: 8px !important;
+          margin-right: 4px !important;
+          width: 32px !important;
+          height: 32px !important;
+          transition: all 0.2s ease !important;
+        }
+
+        .EasyMDEContainer .editor-toolbar button:hover {
+          background-color: #334155 !important;
+          color: #ffffff !important;
+        }
+
+        .EasyMDEContainer .editor-toolbar button.active {
+          background-color: #2563eb !important;
+          color: #ffffff !important;
+        }
+
+        .EasyMDEContainer .editor-toolbar i.separator {
+          border-left: 1px solid #334155 !important;
+          border-right: none !important;
+          margin: 0 8px !important;
+        }
+
+        .EasyMDEContainer .CodeMirror {
+          background-color: #0f172a !important;
+          color: #cbd5e1 !important;
+          border: 1px solid #334155 !important;
+          border-top: none !important;
+          border-bottom-left-radius: 16px !important;
+          border-bottom-right-radius: 16px !important;
+          font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+          font-size: 15px !important;
+          line-height: 1.75 !important;
+          padding: 24px !important;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+        }
+
+        /* Elements inside CodeMirror editor */
+        .EasyMDEContainer .CodeMirror .cm-header-1 {
+          font-size: 2rem !important;
+          line-height: 1.3 !important;
+          font-weight: 800 !important;
+          color: #ffffff !important;
+        }
+
+        .EasyMDEContainer .CodeMirror .cm-header-2 {
+          font-size: 1.5rem !important;
+          line-height: 1.4 !important;
+          font-weight: 700 !important;
+          color: #ffffff !important;
+        }
+
+        .EasyMDEContainer .CodeMirror .cm-header-3 {
+          font-size: 1.25rem !important;
+          line-height: 1.4 !important;
+          font-weight: 600 !important;
+          color: #ffffff !important;
+        }
+
+        .EasyMDEContainer .CodeMirror .cm-comment {
+          background-color: #1e293b !important;
+          padding: 2px 6px !important;
+          border-radius: 4px !important;
+          font-family: monospace !important;
+          color: #f43f5e !important;
+        }
+
+        .EasyMDEContainer .CodeMirror .cm-string {
+          color: #10b981 !important;
+        }
+
+        .EasyMDEContainer .CodeMirror .cm-link {
+          color: #3b82f6 !important;
+          text-decoration: underline !important;
+        }
+
+        .EasyMDEContainer .CodeMirror .cm-url {
+          color: #64748b !important;
+        }
+
+        .EasyMDEContainer .CodeMirror-focused {
+          border-color: #3b82f6 !important;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+        }
+
+        .EasyMDEContainer .CodeMirror-cursor {
+          border-left: 2px solid #3b82f6 !important;
+        }
+
+        .EasyMDEContainer .CodeMirror-selected {
+          background-color: #1e3a8a !important;
+        }
+
+        .EasyMDEContainer .editor-statusbar {
+          color: #64748b !important;
+          padding: 10px 16px !important;
+          font-size: 11px !important;
+        }
+
+        /* EasyMDE side-by-side or normal Preview styling */
+        .EasyMDEContainer .editor-preview-active-side,
+        .EasyMDEContainer .editor-preview {
+          background-color: #0f172a !important;
+          color: #cbd5e1 !important;
+          border: 1px solid #334155 !important;
+          padding: 24px !important;
+        }
+
+        .EasyMDEContainer .editor-preview h1,
+        .EasyMDEContainer .editor-preview h2,
+        .EasyMDEContainer .editor-preview h3,
+        .EasyMDEContainer .editor-preview h4 {
+          color: #ffffff !important;
+          font-weight: 800 !important;
+          margin-top: 1.5em !important;
+          margin-bottom: 0.5em !important;
+        }
+
+        .EasyMDEContainer .editor-preview h1 { font-size: 2.25rem !important; }
+        .EasyMDEContainer .editor-preview h2 { font-size: 1.875rem !important; }
+        .EasyMDEContainer .editor-preview h3 { font-size: 1.5rem !important; }
+
+        .EasyMDEContainer .editor-preview p {
+          margin-bottom: 1.25em !important;
+          line-height: 1.75 !important;
+        }
+
+        .EasyMDEContainer .editor-preview ul,
+        .EasyMDEContainer .editor-preview ol {
+          margin-bottom: 1.25em !important;
+          padding-left: 1.5em !important;
+        }
+
+        .EasyMDEContainer .editor-preview ul {
+          list-style-type: disc !important;
+        }
+
+        .EasyMDEContainer .editor-preview ol {
+          list-style-type: decimal !important;
+        }
+
+        .EasyMDEContainer .editor-preview code {
+          background-color: #1e293b !important;
+          color: #f43f5e !important;
+          padding: 2px 6px !important;
+          border-radius: 6px !important;
+          font-size: 0.9em !important;
+        }
+
+        .EasyMDEContainer .editor-preview pre {
+          background-color: #1e293b !important;
+          border: 1px solid #334155 !important;
+          border-radius: 12px !important;
+          padding: 16px !important;
+          overflow-x: auto !important;
+          margin-bottom: 1.25em !important;
+        }
+
+        .EasyMDEContainer .editor-preview pre code {
+          background-color: transparent !important;
+          color: #cbd5e1 !important;
+          padding: 0 !important;
+          border-radius: 0 !important;
+          font-size: 0.95em !important;
+        }
+
+        .EasyMDEContainer .editor-preview blockquote {
+          border-left: 4px solid #3b82f6 !important;
+          background-color: #1e293b/30 !important;
+          padding: 12px 20px !important;
+          border-radius: 8px !important;
+          margin-bottom: 1.25em !important;
+          color: #94a3b8 !important;
+        }
+
+        .EasyMDEContainer .editor-preview table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          margin-bottom: 1.25em !important;
+        }
+
+        .EasyMDEContainer .editor-preview th,
+        .EasyMDEContainer .editor-preview td {
+          border: 1px solid #334155 !important;
+          padding: 10px 14px !important;
+        }
+
+        .EasyMDEContainer .editor-preview th {
+          background-color: #1e293b !important;
+          color: #ffffff !important;
+          font-weight: bold !important;
+        }
+      `}</style>
+
 
       {/* --- SIDEBAR TRÁI --- */}
       <div className="w-80 border-r border-slate-800 bg-[#1e293b]/30 flex flex-col p-6 space-y-6">
@@ -374,12 +607,16 @@ const StudentPlanView = () => {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Bài giảng chi tiết (Markdown)</label>
-                    <div className="rounded-2xl border border-slate-800 overflow-hidden bg-[#1e293b]">
+                    <div className="rounded-2xl overflow-hidden bg-[#0f172a]">
                       <SimpleMDE
                         value={selectedLesson.content || ""}
                         onChange={(val: string) => setSelectedLesson({ ...selectedLesson, content: val })}
+                        options={mdeOptions}
                       />
                     </div>
+                    <p className="text-xs text-slate-500 ml-2 mt-2">
+                      💡 <strong>Mẹo:</strong> Bạn có thể kéo thả hình ảnh vào ô nhập liệu, hoặc dán hình ảnh từ clipboard để tự động tải lên. Để tạo bảng, hãy nhấn nút <strong>Table</strong> trên thanh công cụ.
+                    </p>
                   </div>
                 </div>
               )}

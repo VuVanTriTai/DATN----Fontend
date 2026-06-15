@@ -8,6 +8,7 @@ import {
   X, Sparkles, BookMarked, ExternalLink, RefreshCw
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import AIChatBox from '../../components/ai/AIChatBox';
 
 // ─── Low Score Modal ──────────────────────────────────────────────────────────
@@ -427,12 +428,7 @@ const LessonView = () => {
       return;
     }
 
-    // Bài đã completed → không cần tạo thêm
-    if (lessonData.status === 'completed') {
-      setLoadingPool(false);
-      return;
-    }
-
+    // Pool rỗng (kể cả bài đã completed do lần tạo cũ thất bại) → tạo lại
     // Kích hoạt loading và gọi generate đúng 1 lần
     setLoadingPool(true);
     try {
@@ -506,6 +502,52 @@ const LessonView = () => {
       console.error('[handleSubmitQuiz]', err?.response?.data || err);
     } finally {
       setSubmittingQuiz(false);
+    }
+  };
+ 
+  const handleRegenerateQuiz = async () => {
+    const confirmRegen = window.confirm("Bạn có muốn tạo bộ câu hỏi trắc nghiệm mới cho ngày học này không? (Kết quả hiện tại sẽ bị xóa)");
+    if (!confirmRegen) return;
+
+    try {
+      setLoadingPool(true);
+      setQuizResult(null);
+      setSelectedAnswers({});
+      setQuizQuestions([]);
+      setCurrentPage(1);
+
+      await api.lessonQuiz.generatePool(lesson._id);
+
+      // Poll lại DB để lấy pool mới (tối đa 12 lần × 5s = 60s)
+      const MAX_TRIES = 12;
+      for (let i = 0; i < MAX_TRIES; i++) {
+        await new Promise(r => setTimeout(r, 5000));
+        try {
+          const refreshed = await api.plan.getLesson(id!, dayNumber!);
+          if (refreshed.success && refreshed.data.quizPool?.length > 0) {
+            setLesson(refreshed.data);
+            const seen = new Set<string>();
+            const indexed = refreshed.data.quizPool
+              .map((q: any, idx: number) => ({ ...q, _poolIndex: idx }))
+              .filter((q: any) => {
+                const key = (q.question || '').trim().toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+            setQuizQuestions(indexed);
+            setLoadingPool(false);
+            return;
+          }
+        } catch (pollErr) {
+          console.warn('[LessonView] regenerate poll error:', pollErr);
+        }
+      }
+      setQuizFailed(true);
+    } catch (e: any) {
+      alert("Lỗi khi tạo quiz mới: " + (e?.response?.data?.message || e.message));
+    } finally {
+      setLoadingPool(false);
     }
   };
 
@@ -585,8 +627,144 @@ const LessonView = () => {
       case 'study':
         return (
           <div className="prose prose-invert max-w-none animate-in fade-in slide-in-from-bottom-4">
-            <div className="bg-[#1e293b]/30 p-8 lg:p-12 rounded-[2.5rem] border border-slate-800 leading-relaxed text-slate-300">
-              <ReactMarkdown>{lesson?.content}</ReactMarkdown>
+            <div className="bg-[#1e293b]/10 backdrop-blur-md p-8 lg:p-12 rounded-[2.5rem] border border-slate-800/80 leading-relaxed text-slate-300 shadow-xl">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  h1: ({ node, ...props }) => (
+                    <h1 className="text-3xl font-black text-white mt-8 mb-4 border-b border-slate-800 pb-2 flex items-center gap-2" {...props} />
+                  ),
+                  h2: ({ node, ...props }) => (
+                    <h2 className="text-2xl font-black text-blue-400 mt-8 mb-4 flex items-center gap-2" {...props} />
+                  ),
+                  h3: ({ node, ...props }) => (
+                    <h3 className="text-xl font-bold text-slate-100 mt-6 mb-3" {...props} />
+                  ),
+                  p: ({ node, ...props }) => (
+                    <p className="text-base text-slate-300 mb-6 leading-relaxed font-medium" {...props} />
+                  ),
+                  a: ({ node, ...props }) => (
+                    <a className="text-blue-400 hover:text-blue-300 font-bold underline transition-colors" target="_blank" rel="noopener noreferrer" {...props} />
+                  ),
+                  ul: ({ node, ...props }) => (
+                    <ul className="list-disc pl-6 mb-6 space-y-2 text-slate-300" {...props} />
+                  ),
+                  ol: ({ node, ...props }) => (
+                    <ol className="list-decimal pl-6 mb-6 space-y-2 text-slate-300" {...props} />
+                  ),
+                  li: ({ node, ...props }) => (
+                    <li className="text-slate-300 leading-relaxed font-medium" {...props} />
+                  ),
+                  blockquote: ({ node, ...props }) => (
+                    <blockquote className="border-l-4 border-blue-500 bg-blue-500/5 p-6 rounded-r-2xl italic my-6 text-slate-300" {...props} />
+                  ),
+                  // Table rendering
+                  table: ({ node, ...props }) => (
+                    <div className="overflow-x-auto w-full my-8 rounded-2xl border border-slate-800/80 bg-slate-900/30 shadow-2xl backdrop-blur-sm custom-scrollbar">
+                      <table className="w-full border-collapse text-left" {...props} />
+                    </div>
+                  ),
+                  thead: ({ node, ...props }) => (
+                    <thead className="bg-[#1e293b]/60 border-b border-slate-800" {...props} />
+                  ),
+                  tbody: ({ node, ...props }) => (
+                    <tbody className="divide-y divide-slate-800/40" {...props} />
+                  ),
+                  th: ({ node, ...props }) => (
+                    <th className="px-6 py-4 font-black text-xs uppercase tracking-wider text-blue-400" {...props} />
+                  ),
+                  td: ({ node, ...props }) => (
+                    <td className="px-6 py-4 text-sm text-slate-300 font-medium align-middle" {...props} />
+                  ),
+                  tr: ({ node, ...props }) => (
+                    <tr className="hover:bg-slate-800/30 transition-colors duration-200" {...props} />
+                  ),
+                  // Image rendering with zoom-in modal
+                  img: ({ node, ...props }) => {
+                    const [isOpen, setIsOpen] = useState(false);
+                    return (
+                      <span className="my-8 flex flex-col items-center">
+                        <span className="relative group overflow-hidden rounded-2xl border border-slate-800/80 shadow-2xl block">
+                          <img
+                            className="max-w-full md:max-w-2xl hover:scale-[1.01] hover:border-slate-700 cursor-zoom-in transition-all duration-300 block"
+                            onClick={() => setIsOpen(true)}
+                            alt={props.alt || "Hình ảnh bài giảng"}
+                            {...props}
+                          />
+                          <span 
+                            onClick={() => setIsOpen(true)}
+                            className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-zoom-in transition-opacity duration-300"
+                          >
+                            <span className="px-4 py-2 bg-slate-900/80 text-white text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 shadow-lg">
+                              🔍 Click để phóng to
+                            </span>
+                          </span>
+                        </span>
+                        {props.alt && (
+                          <span className="text-xs text-slate-500 italic mt-3 font-medium">
+                            {props.alt}
+                          </span>
+                        )}
+                        
+                        {/* Image Modal for Zoom In */}
+                        {isOpen && (
+                          <span 
+                            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out animate-in fade-in duration-200"
+                            onClick={() => setIsOpen(false)}
+                          >
+                            <img 
+                              src={props.src} 
+                              alt={props.alt || "Hình ảnh bài giảng"} 
+                              className="max-h-[90vh] max-w-[90vw] object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-200"
+                            />
+                            <button 
+                              className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 p-2.5 rounded-full transition-all"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsOpen(false);
+                              }}
+                            >
+                              <X size={24} />
+                            </button>
+                          </span>
+                        )}
+                      </span>
+                    );
+                  },
+                  // Code block styling
+                  code: ({ node, className, children, ...props }) => {
+                    const match = /language-(\w+)/.exec(className || '');
+                    const inline = !match;
+                    return inline ? (
+                      <code className="bg-slate-800/60 text-blue-300 px-2 py-0.5 rounded-md font-mono text-sm border border-slate-700/30" {...props}>
+                        {children}
+                      </code>
+                    ) : (
+                      <div className="relative my-6 group">
+                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+                              alert("Đã sao chép mã nguồn!");
+                            }}
+                            className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg border border-slate-700 transition-all active:scale-95"
+                            title="Sao chép mã"
+                          >
+                            <FileText size={14} />
+                          </button>
+                        </div>
+                        <pre className="bg-[#0f172a] border border-slate-800 p-6 rounded-2xl overflow-x-auto font-mono text-sm text-slate-300 shadow-inner">
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        </pre>
+                      </div>
+                    );
+                  }
+                }}
+              >
+                {lesson?.content}
+              </ReactMarkdown>
             </div>
           </div>
         );
@@ -620,17 +798,29 @@ const LessonView = () => {
           <div className="space-y-8 animate-in fade-in pb-20">
 
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-2xl font-black italic">Kiểm tra kiến thức Ngày {dayNumber}</h2>
-              {quizResult && (
-                <div className={`px-6 py-2 rounded-2xl font-black shadow-lg ${
-                  quizResult.percentage >= 90 ? 'bg-yellow-500 text-black shadow-yellow-900/40' :
-                  quizResult.percentage >= 60 ? 'bg-blue-600 shadow-blue-900/40' :
-                                                'bg-red-600 shadow-red-900/40'
-                }`}>
-                  {quizResult.score}/{quizResult.total} ({quizResult.percentage}%)
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                {quizQuestions.length > 0 && (
+                  <button
+                    onClick={handleRegenerateQuiz}
+                    disabled={loadingPool || submittingQuiz}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white rounded-xl text-xs font-black border border-slate-700 transition-all shadow-md"
+                  >
+                    <RefreshCw size={14} className={loadingPool ? "animate-spin" : ""} />
+                    {quizResult ? "Làm thêm quiz mới" : "Đổi bộ câu hỏi khác"}
+                  </button>
+                )}
+                {quizResult && (
+                  <div className={`px-6 py-2 rounded-2xl font-black shadow-lg ${
+                    quizResult.percentage >= 90 ? 'bg-yellow-500 text-black shadow-yellow-900/40' :
+                    quizResult.percentage >= 60 ? 'bg-blue-600 shadow-blue-900/40' :
+                                                  'bg-red-600 shadow-red-900/40'
+                  }`}>
+                    {quizResult.score}/{quizResult.total} ({quizResult.percentage}%)
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Thông báo kết quả sau khi nộp */}
@@ -667,10 +857,14 @@ const LessonView = () => {
                 <div className="flex-1 min-w-0">
                   <p className="font-black text-amber-300 text-sm">AI chưa tạo được câu hỏi cho ngày này</p>
                   <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-                    Có thể do lỗi tạm thời từ AI hoặc nội dung bài học quá ngắn. Bạn có thể{' '}
-                    <strong className="text-amber-300">thoát ra và vào lại ngày học này</strong>{' '}
-                    để thử tạo lại quiz, hoặc nhấn nút bên dưới để bỏ qua và mở khoá ngày tiếp theo.
+                    Có thể do lỗi tạm thời từ AI hoặc nội dung bài học quá ngắn.
                   </p>
+                  <button
+                    onClick={() => { setQuizFailed(false); _initQuizQuestions(lesson); }}
+                    className="mt-3 flex items-center gap-2 px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-black text-xs rounded-xl transition-all active:scale-95"
+                  >
+                    <RefreshCw size={13} /> Thử tạo lại quiz
+                  </button>
                 </div>
               </div>
             )}
@@ -807,25 +1001,45 @@ const LessonView = () => {
 
             {/* Nút nộp bài / quay lại */}
             {!quizResult ? (
-              <button
-                onClick={handleSubmitQuiz}
-                disabled={submittingQuiz || loadingPool}
-                className={`w-full py-5 text-white rounded-[1.5rem] font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 ${
-                  quizQuestions.length === 0
-                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-amber-900/30'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/30'
-                }`}
-              >
-                {submittingQuiz ? <Loader2 className="animate-spin" /> : <CheckCircle size={24} />}
-                {quizQuestions.length === 0 ? `Bỏ qua Quiz & Mở khoá Ngày ${Number(dayNumber) + 1}` : `Nộp bài & Hoàn thành Ngày ${dayNumber}`}
-              </button>
+              <div className="space-y-4">
+                <button
+                  onClick={handleSubmitQuiz}
+                  disabled={submittingQuiz || loadingPool}
+                  className={`w-full py-5 text-white rounded-[1.5rem] font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 ${
+                    quizQuestions.length === 0
+                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-amber-900/30'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/30'
+                  }`}
+                >
+                  {submittingQuiz ? <Loader2 className="animate-spin" /> : <CheckCircle size={24} />}
+                  {quizQuestions.length === 0 ? `Bỏ qua Quiz & Mở khoá Ngày ${Number(dayNumber) + 1}` : `Nộp bài & Hoàn thành Ngày ${dayNumber}`}
+                </button>
+                {quizQuestions.length > 0 && (
+                  <button
+                    onClick={handleRegenerateQuiz}
+                    disabled={submittingQuiz || loadingPool}
+                    className="w-full py-4 bg-slate-900/40 hover:bg-slate-800/60 text-slate-400 hover:text-white rounded-[1.5rem] font-bold text-base border border-slate-800 transition-all flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={18} /> Đổi bộ câu hỏi khác (Tạo lại Quiz)
+                  </button>
+                )}
+              </div>
             ) : (
-              <button
-                onClick={() => navigate(`/plan/${id}`)}
-                className="w-full py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-[1.5rem] font-black text-xl border border-slate-700 transition-all"
-              >
-                ← Quay lại Lộ trình
-              </button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={handleRegenerateQuiz}
+                  disabled={loadingPool}
+                  className="flex-1 py-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-[1.5rem] font-black text-xl shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-2"
+                >
+                  <RefreshCw size={22} /> Làm thêm quiz mới
+                </button>
+                <button
+                  onClick={() => navigate(`/plan/${id}`)}
+                  className="flex-1 py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-[1.5rem] font-black text-xl border border-slate-700 transition-all"
+                >
+                  ← Quay lại Lộ trình
+                </button>
+              </div>
             )}
           </div>
         );

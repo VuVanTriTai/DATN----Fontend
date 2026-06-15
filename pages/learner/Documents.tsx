@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { 
   FileText, Download, Trash2, Clock, 
@@ -12,6 +12,21 @@ const Documents = () => {
   
   // Trạng thái xem: 'text' (Văn bản AI đọc) hoặc 'original' (File gốc PDF/Word)
   const [viewMode, setViewMode] = useState<'text' | 'original'>('text');
+
+  // Helper chuyển đổi URL tương đối (uploads/temp/...) thành tuyệt đối từ API Base
+  const getAbsoluteFileUrl = (url: string) => {
+    if (!url) return '';
+    let normalized = url.replace(/\\/g, '/');
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized;
+    }
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    const backendBase = apiBase.replace(/\/api\/?$/, '');
+    if (!normalized.startsWith('/')) {
+      normalized = '/' + normalized;
+    }
+    return `${backendBase}${normalized}`;
+  };
 
   useEffect(() => { 
     fetchDocs(); 
@@ -41,7 +56,7 @@ const Documents = () => {
   };
 
   const handleDownload = (url: string) => {
-    window.open(url, "_blank");
+    window.open(getAbsoluteFileUrl(url), "_blank");
   };
 
   return (
@@ -79,7 +94,7 @@ const Documents = () => {
         // ---------------------------------
 
         setSelectedDoc(doc);
-        setViewMode('text'); // Mặc định mở tab văn bản khi nhấn vào
+        setViewMode('original'); // Mặc định mở tab TÀI LIỆU GỐC khi click vào doc
       }}
     >
 
@@ -154,16 +169,16 @@ const Documents = () => {
                   <h3 className="text-xl font-black text-white max-w-md truncate">{selectedDoc.title}</h3>
                   <div className="flex gap-6 mt-2">
                      <button 
-                      onClick={() => setViewMode('text')}
-                      className={`text-[10px] font-black uppercase tracking-[0.2em] pb-1 transition-all ${viewMode === 'text' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-500'}`}
-                     >
-                       Văn bản trích xuất
-                     </button>
-                     <button 
                       onClick={() => setViewMode('original')}
-                      className={`text-[10px] font-black uppercase tracking-[0.2em] pb-1 transition-all ${viewMode === 'original' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-500'}`}
+                      className={`text-[10px] font-black uppercase tracking-[0.2em] pb-1 transition-all ${viewMode === 'original' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
                      >
                        Tài liệu gốc (Bản in)
+                     </button>
+                     <button 
+                      onClick={() => setViewMode('text')}
+                      className={`text-[10px] font-black uppercase tracking-[0.2em] pb-1 transition-all ${viewMode === 'text' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                     >
+                       Văn bản trích xuất
                      </button>
                   </div>
                 </div>
@@ -171,7 +186,6 @@ const Documents = () => {
               <button onClick={() => setSelectedDoc(null)} className="p-3 hover:bg-slate-800 rounded-full text-slate-500 transition-all"><X size={24}/></button>
             </div>
             
-            {/* NỘI DUNG HIỂN THỊ TRONG MODAL */}
 <div className="flex-1 overflow-hidden bg-[#0f172a] relative">
   {viewMode === 'text' ? (
     <div className="h-full overflow-y-auto p-8 lg:p-16 custom-scrollbar">
@@ -182,55 +196,115 @@ const Documents = () => {
        </div>
     </div>
   ) : (
-    /* CHẾ ĐỘ XEM TÀI LIỆU GỐC */
-    <div className="h-full w-full bg-slate-900">
-      {/* 
-         BẢO VỆ: Kiểm tra fileUrl tồn tại trước khi xử lý chuỗi để tránh màn hình trắng 
-      */}
+    <div className="h-full w-full bg-slate-900 flex flex-col">
       {selectedDoc?.fileUrl ? (
         (() => {
-          const url = selectedDoc.fileUrl.toLowerCase();
-          
-          // Trường hợp 1: File PDF
-          if (url.includes('.pdf')) {
+          const rawUrl: string = getAbsoluteFileUrl(selectedDoc.fileUrl);
+          const urlLower = rawUrl.toLowerCase();
+          const isLocal = rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1');
+
+          const googleViewerEmbedUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(rawUrl)}&embedded=true`;
+          const googleViewerTabUrl   = `https://docs.google.com/viewer?url=${encodeURIComponent(rawUrl)}`;
+          const isPdf        = urlLower.includes('.pdf') || urlLower.includes('f_pdf') || urlLower.includes('/pdf/');
+          const isOffice     = /\.(docx|doc|pptx|ppt|xlsx|xls)$/.test(urlLower);
+          const isCloudinary = urlLower.includes('/raw/upload/');
+
+          const ActionBar = ({ hint }: { hint: string }) => (
+            <div className="shrink-0 px-6 py-3 bg-[#1e293b] border-t border-slate-700 flex items-center gap-3">
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex-1 hidden sm:block">{hint}</p>
+              {!isLocal && (
+                <button
+                  onClick={() => window.open(googleViewerTabUrl, '_blank')}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl transition-all"
+                >↗ Mở với Google Docs</button>
+              )}
+              <button
+                onClick={() => window.open(rawUrl, '_blank')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all"
+              >↓ Tải xuống</button>
+            </div>
+          );
+
+          if (isPdf) {
             return (
-              <iframe 
-                src={`${selectedDoc.fileUrl}#toolbar=0&navpanes=0`} 
-                className="w-full h-full border-none"
-                title="PDF Preview"
-              />
-            );
-          }
-          
-          // Trường hợp 2: File Word / Excel / PowerPoint
-          if (url.match(/\.(docx|doc|pptx|xlsx)$/) || url.includes('/raw/upload/')) {
-            return (
-              <iframe 
-                // Sử dụng Google Docs Viewer làm dự phòng nếu Microsoft Office Viewer bị chặn
-                src={`https://docs.google.com/viewer?url=${encodeURIComponent(selectedDoc.fileUrl)}&embedded=true`}
-                className="w-full h-full border-none"
-                title="Office Preview"
-              />
+              <>
+                <iframe
+                  key={rawUrl}
+                  src={`${rawUrl}#toolbar=1&navpanes=0&view=FitH`}
+                  className="w-full flex-1 border-none bg-white"
+                  title="PDF Preview"
+                />
+                <ActionBar hint={isLocal ? "PDF chạy trực tiếp từ Localhost" : "Nếu không hiện PDF → dùng nút bên phải"} />
+              </>
             );
           }
 
-          // Trường hợp 3: Không nhận diện được định dạng
+          if (isLocal && (isOffice || isCloudinary || urlLower.includes('uploads/temp/'))) {
+            return (
+              <div className="flex-1 flex flex-col justify-between">
+                <div className="flex-1 flex flex-col items-center justify-center gap-5 p-8 text-center">
+                  <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-400 max-w-md">
+                    <Sparkles size={32} className="mx-auto mb-2 animate-pulse" />
+                    <h4 className="font-bold text-lg mb-1">Môi trường Localhost</h4>
+                    <p className="text-xs text-slate-300">
+                      Hệ thống đang chạy offline trên máy của bạn. Google Docs không thể truy cập tài liệu Word/Excel cục bộ này.
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => window.open(rawUrl, '_blank')}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-blue-900/30"
+                    >
+                      ↓ Tải xuống & Xem bằng Office
+                    </button>
+                  </div>
+                </div>
+                <ActionBar hint="Môi trường Localhost - Không thể preview trực tuyến file Word" />
+              </div>
+            );
+          }
+
+          if (isOffice || isCloudinary) {
+            return (
+              <>
+                <iframe
+                  key={rawUrl}
+                  src={googleViewerEmbedUrl}
+                  className="w-full flex-1 border-none"
+                  title="Document Preview"
+                />
+                <ActionBar hint='Nếu thấy lỗi "Đã xuất hiện lỗi" → nhấn Mở với Google Docs' />
+              </>
+            );
+          }
+
           return (
-            <div className="h-full flex flex-col items-center justify-center space-y-4">
-              <FileSearch size={48} className="text-slate-700" />
-              <p className="text-slate-400">Định dạng này cần được tải về để xem.</p>
-              <button 
-                onClick={() => window.open(selectedDoc.fileUrl, '_blank')}
-                className="text-blue-500 underline font-bold"
-              >
-                Mở trong tab mới
-              </button>
+            <div className="flex-1 flex flex-col items-center justify-center gap-5">
+              <FileSearch size={56} className="text-slate-700" />
+              <div className="text-center space-y-1">
+                <p className="text-slate-300 font-bold">Định dạng này không hỗ trợ xem trước</p>
+                <p className="text-slate-500 text-sm">Hãy tải xuống để mở bằng ứng dụng trên máy tính.</p>
+              </div>
+              <div className="flex gap-3">
+                {!isLocal && (
+                  <button onClick={() => window.open(googleViewerTabUrl, '_blank')}
+                    className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-bold rounded-xl transition-all">
+                    ↗ Thử Google Docs
+                  </button>
+                )}
+                <button onClick={() => window.open(rawUrl, '_blank')}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-all">
+                  ↓ Tải xuống
+                </button>
+              </div>
             </div>
           );
         })()
       ) : (
-        <div className="h-full flex items-center justify-center text-slate-500">
-          Không tìm thấy liên kết tệp tin.
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500">
+          <FileSearch size={48} className="text-slate-700" />
+          <p className="font-bold">Không tìm thấy đường dẫn tệp tin.</p>
+          <p className="text-xs text-slate-600">Thử tải xuống từ nút bên dưới.</p>
         </div>
       )}
     </div>
